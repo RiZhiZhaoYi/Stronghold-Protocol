@@ -259,9 +259,9 @@
   height: 1px;
   background: linear-gradient(90deg, var(--mint-700), transparent 30%, transparent 70%, var(--mint-700));
 }
-.room-bar__left { display: flex; align-items: center; gap: .22rem; min-width: 0; }
-.room-bar__label { display: flex; flex-direction: column; font-size: .17rem; font-weight: 700; color: var(--text-md); line-height: 1.35; }
-.room-bar__center { display: flex; flex-direction: column; align-items: center; gap: .06rem; }
+.room-bar__left { display: flex; align-items: center; gap: .14rem; min-width: 0; }
+.room-bar__label { flex: none; display: flex; flex-direction: column; font-size: .17rem; font-weight: 700; color: var(--text-md); line-height: 1.35; }
+.room-bar__center { display: flex; flex-direction: column; align-items: center; gap: .04rem; min-width: 0; }
 .room-bar__right { justify-self: end; display: flex; align-items: center; gap: .16rem; }
 .room-bar__status { font-size: .15rem; }
 .room-bar__status .icon { width: .18rem; height: .18rem; margin-right: .05rem; vertical-align: -.03rem; }
@@ -282,6 +282,7 @@
   font-size: .18rem;
   font-weight: 700;
   letter-spacing: .08em;
+  white-space: nowrap;
   transition: color var(--t-fast), background-color var(--t-med), box-shadow var(--t-med);
 }
 .dpick__opt:last-child { border-right: 0; }
@@ -296,6 +297,34 @@
 }
 .dpick__opt.is-active .icon { opacity: 1; filter: drop-shadow(0 0 5px var(--d-color)); }
 .dpick--ro { border: 0; background: none; gap: .18rem; align-items: center; font-size: .14rem; }
+
+/* ---- 「恭喜发财」 switch (LUCKY_MODE, js/screens/room.js LuckyPicker) ------------------------------------------
+   Sits next to the difficulty picker in the bottom bar: it stacks on the difficulty instead of replacing it. */
+.lucky-pick {
+  display: flex; align-items: center; gap: .08rem; flex: none; height: .54rem; padding: 0 .12rem;
+  border: 1px solid var(--line-2); background: rgba(0, 0, 0, .3); color: var(--text-lo);
+  font-size: .16rem; font-weight: 700; letter-spacing: .04em; white-space: nowrap;
+  transition: color var(--t-fast), border-color var(--t-med), background var(--t-med);
+}
+.lucky-pick:hover:not(:disabled) { color: var(--text-hi); }
+.lucky-pick:disabled { cursor: default; }
+.lucky-pick .icon { width: .22rem; height: .22rem; flex: none; color: var(--gold); opacity: .55; transition: opacity var(--t-fast); }
+.lucky-pick.is-on { color: var(--gold); border-color: var(--gold); background: rgba(255, 198, 0, .1); }
+.lucky-pick.is-on .icon { opacity: 1; filter: drop-shadow(0 0 5px rgba(255, 198, 0, .6)); }
+.lucky-pick__switch { position: relative; flex: none; width: .64rem; height: .28rem; border: 1px solid var(--line-2); background: rgba(0, 0, 0, .45); }
+.lucky-pick__switch i { position: absolute; left: .02rem; top: .02rem; width: .2rem; height: .2rem; background: var(--text-dim); transition: transform var(--t-med) var(--ease-out), background var(--t-med); }
+.lucky-pick.is-on .lucky-pick__switch { border-color: var(--gold); }
+.lucky-pick.is-on .lucky-pick__switch i { transform: translateX(.34rem); background: var(--gold); }
+.lucky-pick__state { font-size: .15rem; color: var(--text-dim); font-weight: 400; }
+.lucky-pick__state.is-on { color: var(--gold); font-weight: 700; }
+.lucky-pick--ro { border: 0; background: none; gap: .12rem; font-size: .16rem; }
+.lucky-tag {
+  --bk-c: var(--gold);
+  display: inline-flex; align-items: center; gap: .05rem; height: .38rem; padding: 0 .12rem;
+  border: 1px solid var(--gold); background: rgba(255, 198, 0, .16); color: var(--gold);
+  font-size: .16rem; font-weight: 900; letter-spacing: .1em; white-space: nowrap;
+}
+.lucky-tag .icon { width: .18rem; height: .18rem; }
 
 .ready-count[hidden] { display: none; }
 .ready-count { display: flex; align-items: baseline; gap: .06rem; font-size: .16rem; }

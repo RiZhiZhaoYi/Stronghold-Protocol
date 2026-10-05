@@ -5,7 +5,8 @@
 // off. 放弃模拟: g.leave then room.leave (the platform treats it as a quit), back to the lobby.
 
 import { useState } from '../../vendor/hooks.module.js';
-import { html, Button, Modal, PingPill, DifficultyTag, Countdown, MicroLabel } from './components.js';
+import { LUCKY_MODE } from '../../../shared/constants.js';
+import { html, Button, Modal, PingPill, DifficultyTag, Countdown, MicroLabel, Icon } from './components.js';
 import { actions } from './gameActions.js';
 import { toastError } from './toasts.js';
 import { net } from '../net.js';
@@ -109,6 +110,16 @@ export function AwayOverlay({ onBack = () => {} }) {
 }
 
 /**
+ * 「恭喜发财」 mark of the pre-game header (shared/constants.js LUCKY_MODE, m.public.lucky). Nothing while the mode is
+ * off, so an ordinary match's header is unchanged.
+ * @param {{ pub: any }} props
+ */
+export function LuckyTag({ pub }) {
+  if (!pub || pub.lucky !== true) return null;
+  return html`<span class="lucky-tag" title=${LUCKY_MODE.desc}><${Icon} name="crown" />${LUCKY_MODE.name}</span>`;
+}
+
+/**
  * Pre-game step header.
  * @param {{ step: number, of: number, title: string, micro: string, pub: any, total?: number|null, onExit: Function }} props
  */
@@ -120,6 +131,7 @@ export function StepHeader({ step, of, title, micro, pub, total, onExit }) {
       <div class="stephead__meta">
         <${PingPill} ms=${conn.ping} online=${conn.status === 'online'} />
         ${pub?.difficulty ? html`<${DifficultyTag} difficulty=${pub.difficulty} />` : null}
+        <${LuckyTag} pub=${pub} />
       </div>
     </div>
     <div class="stephead__center">

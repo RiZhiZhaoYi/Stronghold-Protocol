@@ -3,7 +3,7 @@
 export const PROTOCOL_VERSION = 1;
 /** Release version shown to players (title screen, server banner, /healthz). Kept equal to package.json "version"
  * (test/version.test.js); PROTOCOL_VERSION above is the separate wire-format number. */
-export const APP_VERSION = '0.1.3';
+export const APP_VERSION = '0.1.4';
 
 export const MAX_SEATS = 4;
 /**
@@ -23,6 +23,36 @@ export const DIFFICULTY_COLORS = { FUNNY: '#f6a329', NORMAL: '#e85a1a', HARD: '#
 // modeId in data/config.json = `mode_${type}_${difficulty.toLowerCase()}` with type single|multi
 export const modeIdFor = (roomMode, difficulty) =>
   `mode_${roomMode === 'solo' ? 'single' : 'multi'}_${difficulty.toLowerCase()}`;
+
+/**
+ * 「恭喜发财」— an OPTIONAL match mode (room.lucky) that stacks on any difficulty and in both room types (owner's
+ * request 2026-10-05: "新增一个模式，叫「恭喜发财」，每个人在进入游戏时都能获取一个随机五阶干员，但是都不重复").  When it is on, every
+ * player of the match draws ONE random tier-5 operator at the strategy draft (Match.grantLuckyChess) — every draw is
+ * distinct, and the drawn operator is shown next to that player in the 选择策略 order list (m.public players[].lucky)
+ * so the pick can be made around it.  The operator is a normal gained piece: it costs a shared-pool copy, sits in the
+ * 整备区 and can be deployed like any other operator.
+ *
+ * The exclusion list is a rule of the request.  `tier` is not strictly necessary (缪尔赛思 is tier 6 and could never
+ * be drawn from the tier-5 pool), but keeping it stated makes the rule explicit and lets the exclusion list hold any
+ * operator.
+ */
+export const LUCKY_MODE = Object.freeze({
+  /** room.state / m.public flag name (room.create { lucky }, room.setLucky { lucky }, Match opts.lucky) */
+  flag: 'lucky',
+  id: 'lucky',
+  name: '恭喜发财',
+  en: 'FORTUNE DRAW',
+  /** one-line description (lobby card, room briefing) */
+  desc: '每名博士开局各获得一名随机五阶干员，互不重复。',
+  /** the tier every player draws from */
+  tier: 5,
+  /** operators that may never be drawn (name kept in the comment for the data-less case) */
+  excludedChessIds: Object.freeze([
+    'chess_char_6_11_a', // 缪尔赛思 (Muelsyse)
+  ]),
+  /** official-card effects list shown next to the toggle */
+  effects: Object.freeze(['每名博士开局随机获得 1 名五阶干员', '全队不重复', '不包含缪尔赛思']),
+});
 
 export const PHASE = Object.freeze({
   LOBBY: 'LOBBY',

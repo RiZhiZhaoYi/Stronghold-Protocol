@@ -8,9 +8,14 @@
 //     Humans and bots take the lowest free seat index; seat indexes never compact.
 //   * ▸ Being in a LOBBY room and sending room.create / room.join implicitly leaves it. While your room is
 //     in a match, create/join of another room fails with ROOM_STARTED (send g.leave or room.leave first).
-//   * Host-only: room.setDifficulty, room.addBot, room.removeBot, room.kick, room.start. ▸ Changing the difficulty
+//   * Host-only: room.setDifficulty, room.setLucky, room.addBot, room.removeBot, room.kick, room.start. ▸ Changing the difficulty
 //     un-readies the other humans. ▸ room.start requires every other human to be connected and ready;
 //     the host's start counts as the host's ready (the host may still toggle room.ready for display).
+//   * 「恭喜发财」 (shared/constants.js LUCKY_MODE, owner's request 2026-10-05): an OPTIONAL mode of a room, stacked on
+//     the difficulty and available in both solo and co-op. `room.create { lucky }` sets it initially and the host may
+//     toggle it with room.setLucky { lucky } while the room is in LOBBY (a change un-readies the other humans, like a
+//     difficulty change). room.state carries `lucky`; the match receives it as opts.lucky and hands every player one
+//     distinct random tier-5 operator at the strategy draft (Match.grantLuckyChess). Off by default.
 //   * room.kick {seat, playerId} (community report #17, owner approved): before the match only, the host removes another
 //     human like an AI seat (an AI seat stays room.removeBot's; never the host itself). `playerId` names the player the
 //     host confirmed: a seat that changed hands meanwhile (left, someone else joined) is refused with BAD_TARGET. The
@@ -119,13 +124,15 @@ function freezeLoadout(loadout) {
   return Object.freeze(out);
 }
 
-/** One room: 4 seat slots, host, difficulty, optional running match. */
+/** One room: 4 seat slots, host, difficulty, optional 「恭喜发财」 mode, optional running match. */
 export class Room {
-  /** @param {string} code @param {'solo'|'coop'} mode @param {string} difficulty @param {number} now */
-  constructor(code, mode, difficulty, now) {
+  /** @param {string} code @param {'solo'|'coop'} mode @param {string} difficulty @param {number} now @param {boolean} [lucky] */
+  constructor(code, mode, difficulty, now, lucky = false) {
     this.code = code;
     this.mode = mode;
     this.difficulty = difficulty;
+    /** 「恭喜发财」 (shared/constants.js LUCKY_MODE): host-set, stacks on the difficulty, carried into the match */
+    this.lucky = !!lucky;
     /** @type {string | null} */
     this.hostId = null;
     /** @type {(Seat | null)[]} */
@@ -175,6 +182,8 @@ export class Room {
       hostId: this.hostId,
       mode: this.mode,
       difficulty: this.difficulty,
+      // 「恭喜发财」 (LUCKY_MODE): off unless the host turned it on before the match
+      lucky: this.lucky,
       inMatch: !!this.match,
       seats: this.seats.map((s) => (s
         ? { seat: s.seat, playerId: s.playerId, name: s.name, isBot: s.isBot, ready: s.ready, connected: s.connected && !s.left }
@@ -284,6 +293,7 @@ export class Lobby {
       case 'room.leave': return this.leave(session);
       case 'room.ready': return this.ready(session, msg);
       case 'room.setDifficulty': return this.setDifficulty(session, msg);
+      case 'room.setLucky': return this.setLucky(session, msg);
       case 'room.addBot': return this.addBot(session);
       case 'room.removeBot': return this.removeBot(session, msg);
       case 'room.kick': return this.kick(session, msg);
@@ -339,7 +349,7 @@ export class Lobby {
   // room.* handlers
   // ---------------------------------------------------------------------------------------------------
 
-  create(session, { mode, difficulty }) {
+  create(session, { mode, difficulty, lucky = false }) {
     const cur = this.roomOf(session);
     if (cur && cur.match) return fail(ERR.ROOM_STARTED, 'leave your running match first');
     if (this.rooms.size >= this.opts.maxRooms) return fail(ERR.INTERNAL, 'too many rooms');
@@ -355,7 +365,7 @@ export class Lobby {
     const code = this.genCode();
     if (!code) return fail(ERR.INTERNAL, 'no room code available');
     if (cur) this.removeMember(cur, session.playerId);
-    const room = new Room(code, mode, difficulty, this.now());
+    const room = new Room(code, mode, difficulty, this.now(), lucky);
     room.ownerKey = key;
     room.seats[0] = this.humanSeat(0, session);
     room.hostId = session.playerId;
@@ -363,7 +373,7 @@ export class Lobby {
     session.roomCode = code;
     session.notice = null;
     session.pendingResult = null;
-    this.log.info(`[lobby] ${code} created (${mode}/${difficulty}) by ${session.name}`);
+    this.log.info(`[lobby] ${code} created (${mode}/${difficulty}${room.lucky ? '+lucky' : ''}) by ${session.name}`);
     this.broadcastState(room);
     return OK;
   }
@@ -464,6 +474,25 @@ export class Lobby {
     this.dropReplay(room, session.playerId);
     if (room.difficulty !== difficulty) {
       room.difficulty = difficulty;
+      for (const s of room.seats) if (s && !s.isBot && s.playerId !== room.hostId) s.ready = false;
+      this.broadcastState(room);
+    }
+    return OK;
+  }
+
+  /**
+   * room.setLucky (host, before the match): the 「恭喜发财」 mode (shared/constants.js LUCKY_MODE) on/off. Like a
+   * difficulty change it un-readies the other humans — the match they readied for is a different one.
+   */
+  setLucky(session, { lucky }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (room.match) return fail(ERR.ROOM_STARTED);
+    if (room.spectatorOf(session.playerId)) return fail(ERR.SPECTATOR);
+    this.dropReplay(room, session.playerId);
+    if (room.lucky !== !!lucky) {
+      room.lucky = !!lucky;
       for (const s of room.seats) if (s && !s.isBot && s.playerId !== room.hostId) s.ready = false;
       this.broadcastState(room);
     }
@@ -598,6 +627,8 @@ export class Lobby {
         mode: room.mode,
         difficulty: room.difficulty,
         modeId: modeIdFor(room.mode, room.difficulty),
+        // 「恭喜发财」 (LUCKY_MODE): the room's optional mode, off by default
+        lucky: room.lucky,
         seats,
         // the spectator seats (header): watched like eliminated players, never players
         spectators: room.spectators.map((s) => s.playerId),
@@ -617,7 +648,7 @@ export class Lobby {
       room.matchKey = key;
       room.replay = null;
       room.matchCount++;
-      this.log.info(`[lobby] ${room.code} match #${room.matchCount} starting (${room.mode}/${room.difficulty}, ${seats.length} seats, seed ${seed})`);
+      this.log.info(`[lobby] ${room.code} match #${room.matchCount} starting (${room.mode}/${room.difficulty}${room.lucky ? '+lucky' : ''}, ${seats.length} seats, seed ${seed})`);
       this.broadcastState(room);
       match.start();
     } catch (e) {

@@ -11,7 +11,7 @@
 // button for 观战中 and offers 入座 (room.join of the room) while a player seat is free.
 
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
-import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, MAX_SEATS, MAX_SPECTATORS } from '../../../shared/constants.js';
+import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, MAX_SEATS, MAX_SPECTATORS, LUCKY_MODE } from '../../../shared/constants.js';
 import {
   html, Button, Icon, MicroLabel, PingPill, AvatarFrame, DifficultyTag, DifficultyIcon, Tooltip, confirmDialog, doctorNo,
 } from '../ui/components.js';
@@ -169,6 +169,31 @@ function InviteBox({ code }) {
   </div>`;
 }
 
+/**
+ * 「恭喜发财」 switch of the room (shared/constants.js LUCKY_MODE): the host toggles it (room.setLucky), everyone else
+ * sees the state read-only. It stacks on the difficulty, so it sits next to the difficulty picker rather than
+ * replacing it.
+ * @param {{ room: any, isHost: boolean, busy: boolean, onToggle: (on: boolean) => void }} props
+ */
+function LuckyPicker({ room, isHost, busy, onToggle }) {
+  const on = room?.lucky === true;
+  if (!isHost) {
+    return html`<div class=${`lucky-pick lucky-pick--ro${on ? ' is-on' : ''}`}>
+      <${Icon} name="crown" />
+      <span>${LUCKY_MODE.name}</span>
+      <span class=${`lucky-pick__state${on ? ' is-on' : ''}`}>${on ? '已开启' : '未开启'}</span>
+      <span class="t-dim">由创建者选择</span>
+    </div>`;
+  }
+  return html`<button type="button" class=${`lucky-pick${on ? ' is-on' : ''}`} aria-pressed=${on ? 'true' : 'false'}
+      disabled=${!!busy} title=${LUCKY_MODE.desc} onClick=${() => onToggle(!on)}>
+    <${Icon} name="crown" />
+    <span>${LUCKY_MODE.name}</span>
+    <span class="lucky-pick__switch" aria-hidden="true"><i></i></span>
+    <span class=${`lucky-pick__state${on ? ' is-on' : ''}`}>${on ? '已开启' : '未开启'}</span>
+  </button>`;
+}
+
 function DifficultyPicker({ room, isHost, busy, onPick }) {
   if (!isHost) {
     return html`<div class="dpick dpick--ro">
@@ -225,6 +250,8 @@ export function RoomScreen() {
     if (ok) run(`kick${seat}`, () => net.request('room.kick', { seat, playerId }));
   };
   const setDifficulty = (difficulty) => run('diff', () => net.request('room.setDifficulty', { difficulty }));
+  // 「恭喜发财」 (LUCKY_MODE): host-only before the match; the other humans are un-readied by the server
+  const setLucky = (lucky) => run('lucky', () => net.request('room.setLucky', { lucky }));
   // spectator seats: the host frees one; a spectator takes a free player seat with room.join of this room
   const removeSpectator = (playerId) => run(`rs${playerId}`, () => net.request('room.removeSpectator', { playerId }));
   const sit = () => run('sit', () => net.request('room.join', { code: room.code }));
@@ -277,7 +304,8 @@ export function RoomScreen() {
       </div>
       <div class="topbar__center">
         <${MicroLabel} tone="mint">${coop ? 'ALLIANCE LOBBY' : 'SOLO SIMULATION'}<//>
-        <h1 class="topbar__title">${coop ? '同盟模拟' : '独立模拟'}<span class="topbar__sep"></span><${DifficultyTag} difficulty=${room.difficulty} size="lg" /></h1>
+        <h1 class="topbar__title">${coop ? '同盟模拟' : '独立模拟'}<span class="topbar__sep"></span><${DifficultyTag} difficulty=${room.difficulty} size="lg" />
+          ${room.lucky ? html`<span class="lucky-tag" title=${LUCKY_MODE.desc}><${Icon} name="crown" />${LUCKY_MODE.name}</span>` : null}</h1>
       </div>
       <div class="topbar__right">
         ${coop ? html`<${InviteBox} code=${room.code} />` : html`<div class="solo-note"><${MicroLabel}>SINGLE OPERATOR<//><span>仅限 1 名博士</span></div>`}
@@ -304,6 +332,7 @@ export function RoomScreen() {
       <div class="room-bar__left">
         <span class="room-bar__label">模拟难度<${MicroLabel}>DIFFICULTY<//></span>
         <${DifficultyPicker} room=${room} isHost=${facts.isHost} busy=${busy} onPick=${setDifficulty} />
+        <${LuckyPicker} room=${room} isHost=${facts.isHost} busy=${busy} onToggle=${setLucky} />
       </div>
       <div class="room-bar__center">
         <div class="ready-count" hidden=${!coop}>

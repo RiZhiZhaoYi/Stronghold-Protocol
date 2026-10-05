@@ -12,6 +12,10 @@
 //   opts.mode        'solo' | 'coop'
 //   opts.difficulty  'FUNNY'|'NORMAL'|'HARD'|'ABYSS'
 //   opts.modeId      string                     modeIdFor(mode, difficulty), e.g. 'mode_multi_hard'
+//   opts.lucky       boolean (optional)         「恭喜发财」 (shared/constants.js LUCKY_MODE; room.lucky): every player
+//                                              draws one distinct random tier-5 operator at the strategy draft
+//                                              (grantLuckyChess). Stacks on any difficulty and both room types; off by
+//                                              default, so a platform written against the old contract is unaffected.
 //   opts.seats       Array<{ seat: 0..3, playerId: string, name: string, isBot: boolean, connected: boolean,
 //                            loadout?: { [baseChessId]: { skill: index, module: uniEquipId|'none'|null } } | null }>
 //                    sorted by seat, 1–4 entries, ≥ 1 human; solo ⇒ exactly 1 human and no bots.
@@ -130,7 +134,7 @@
 //     human is left at all the match ends ('abandoned'); when nobody alive is left it ends as 'eliminated'.
 
 import { C2S, unitStatsEntry } from '../../shared/protocol.js';
-import { PHASE, ERR, EMOTES, EMOTE_COOLDOWN_MS, GEO, modeIdFor, layerGainRoom } from '../../shared/constants.js';
+import { PHASE, ERR, EMOTES, EMOTE_COOLDOWN_MS, GEO, modeIdFor, layerGainRoom, LUCKY_MODE } from '../../shared/constants.js';
 import { Battle } from '../sim/Battle.js';
 import { DataSource } from '../sim/simdata.js';
 import { createRng, deriveSeed } from '../sim/rng.js';
@@ -239,6 +243,11 @@ export class Match {
     this.mode = opts.mode === 'solo' ? 'solo' : 'coop';
     this.difficulty = opts.difficulty;
     this.modeId = opts.modeId || modeIdFor(this.mode, opts.difficulty);
+    /**
+     * 「恭喜发财」 (LUCKY_MODE): the room's optional mode flag, stacked on the difficulty. Every player draws one
+     * distinct random tier-5 operator at the strategy draft; m.public players[].lucky carries the draw.
+     */
+    this.lucky = !!opts.lucky;
     this.seed = (Number(opts.seed) >>> 0) || 1;
     this.log = opts.log || noopLog;
     this.sendFn = opts.send;
@@ -873,6 +882,9 @@ export class Match {
       spRound: this.gd.spRounds().includes(this.round),
       // DESIGN §14: 'client' = battles are simulated by the browsers (b.start specs), 'server' = legacy streaming
       combatMode: this.clientCombat ? 'client' : 'server',
+      // 「恭喜发财」 (LUCKY_MODE, room.lucky): the optional mode stacked on the difficulty — every player draws one
+      // distinct random tier-5 operator at the strategy draft (players[].lucky names it)
+      lucky: !!this.lucky,
       // solo pause (g.pause, DESIGN §14): the battle, its field clock and every deadline are frozen while true
       paused: !!this.paused,
       players: this.order.map((ps) => ({
@@ -897,6 +909,10 @@ export class Match {
         fieldId: this.fieldOf(ps),
         status: this.statusOf(ps),
         autoplay: ps.autoplay,
+        // 「恭喜发财」 (LUCKY_MODE): the operator this player drew at the strategy draft (+ its display name, so the
+        // order list renders without waiting for the client's chess data). Omitted entirely while the mode is off or
+        // before the draw, so an ordinary match's m.public is byte-for-byte what it was.
+        ...(ps.luckyChess ? { lucky: ps.luckyChess, luckyName: this.gd.chess(ps.luckyChess)?.name || ps.luckyChess } : {}),
         // the LP this round's own battle will cost at settlement so far (COMBAT / 联防 only, omitted when 0)
         ...this._pendingLpView(ps),
       })),
@@ -1305,6 +1321,9 @@ export class Match {
   enterBandDraft() {
     if (this.phase !== PHASE.INFO_CHECK) return;
     this.phase = PHASE.BAND_DRAFT;
+    // 「恭喜发财」 (LUCKY_MODE): the opening draws happen before the order is drawn and before the first turn starts, so
+    // every player — the picker included — sees the whole team's operators while the strategies are chosen
+    this.grantLuckyChess();
     const order = this.order.map((p) => p.playerId);
     if (!this.isSolo) this.rngDraft.shuffle(order);
     const skips = this.isSolo ? 0 : this.gd.bandDraft.skipsPerPlayer;
@@ -1317,6 +1336,49 @@ export class Match {
     this.setDeadline(0);
     this.startDraftTurn();
     this.markPublic();
+  }
+
+  /**
+   * 「恭喜发财」 (LUCKY_MODE + opts.lucky): hand every player one random operator of `LUCKY_MODE.tier`, all different.
+   *
+   * The candidates are the SHARED POOL's own entries of that tier — visible, not banned for this match (a mode-disabled
+   * bond can ban an operator: with 标准's 10 switched-off bonds 烛煌, 史尔特尔, 隐德来希 … are out) and still holding a copy
+   * — minus LUCKY_MODE.excludedChessIds (缪尔赛思). Drawing from the pool is what makes the grant always succeed: an
+   * operator the pool does not hold would be granted with `poolCopies: 0`, i.e. a phantom that breaks the
+   * `left + held == cap` accounting (server/match/invariants.js).
+   *
+   * The draws are a plain uniform sample without replacement, so the whole team is guaranteed distinct operators, not
+   * merely distinct draws (owner's request: "都不重复"). An AI seat draws like a human. More seats than candidates
+   * (never with the shipped data) simply leaves the last seats without a draw.
+   *
+   * The drawn operator is granted as a normal gained piece (PlayerState.acquireChess → the 整备区, taking a pool copy)
+   * and remembered on the seat (`ps.luckyChess`) so m.public can show it next to that player in the 选择策略 order list.
+   * It is granted HERE and not at ROUND_START because the choice of strategy is meant to be made around it.
+   *
+   * Randomness comes from rngSetup — the per-match "setup" stream the bans and the stage already used. Nothing else draws
+   * from it after construction, so taking these numbers does not shift any other stream (rngShop/rngDraft/rngWaves/rngMeta).
+   */
+  grantLuckyChess() {
+    if (!this.lucky) return;
+    const off = new Set(LUCKY_MODE.excludedChessIds);
+    const candidates = [];
+    for (const [id, e] of this.pool.entries) if (e.tier === LUCKY_MODE.tier && !off.has(id)) candidates.push(id);
+    if (!candidates.length) {
+      this.log.warn?.(`[match ${this.roomCode}] 恭喜发财: no tier-${LUCKY_MODE.tier} operator in the pool — nothing granted`);
+      return;
+    }
+    this.rngSetup.shuffle(candidates);
+    let i = 0;
+    for (const ps of this.order) {
+      if (i >= candidates.length) break;
+      if (!ps.alive || ps.luckyChess) continue;
+      const id = candidates[i];
+      const piece = ps.acquireChess(id, { source: 'lucky' });
+      if (!piece) continue; // no room / a merge (never for one copy): the candidate stays available
+      i++;
+      ps.luckyChess = this.gd.baseIdOf(piece.id) || id;
+      this.toast(ps, 'info', `恭喜发财：开局获得${this.gd.chess(piece.id)?.name || ps.luckyChess}`);
+    }
   }
 
   draftTurn() {

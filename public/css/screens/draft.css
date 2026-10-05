@@ -4,16 +4,29 @@
    the order list and its dialog (js/ui/matchInfo.js MatchInfoDialog, GitHub issue #8 item 1).
    ========================================================================================== */
 
-.draft__main { position: relative; z-index: 1; flex: 1; min-height: 0; display: grid; grid-template-columns: 3.9rem 1fr 5rem; gap: .3rem; padding: .3rem .42rem .36rem; }
+.draft__main { position: relative; z-index: 1; flex: 1; min-height: 0; display: grid; grid-template-columns: 4.3rem 1fr 5rem; gap: .3rem; padding: .3rem .42rem .36rem; }
 
 .draft-order { display: flex; flex-direction: column; gap: .1rem; min-height: 0; }
 .dorder {
   position: relative; display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: .12rem;
-  padding: .1rem .12rem .1rem .08rem; background: rgba(12, 15, 14, .82); border: 1px solid var(--line);
+  /* the bottom margin leaves the 「恭喜发财」 chip's overhanging name room without moving the next row (draft.css below) */
+  margin-bottom: .12rem; padding: .1rem .12rem .1rem .08rem; background: rgba(12, 15, 14, .82); border: 1px solid var(--line);
   transition: border-color var(--t-med), background var(--t-med);
 }
 .dorder .pavatar { --pa: .66rem; }
 .dorder__idx { font-size: .22rem; color: var(--text-dim); width: .26rem; text-align: center; }
+/* 「恭喜发财」 (LUCKY_MODE, bandDraft.js LuckyOp): the tier-5 operator this player drew at the start of the match,
+   beside the avatar in the 选择策略 order list — so the strategy is picked around it. The chip stays narrow (the order
+   column is 4.3rem wide) and the row pays for it with fewer spare pixels (margin-bottom), not with a longer list. */
+.dorder__lucky { position: relative; display: flex; flex-direction: column; align-items: center; gap: .02rem; min-width: 0; }
+.dorder__lucky .uthumb__art { border-color: var(--gold); box-shadow: inset 0 0 .08rem rgba(255, 198, 0, .45); }
+/* the name fills the item and may run over the gap to the avatar: 5+ character names (归溟幽灵鲨) stay readable, and
+   m.public carries the name so the client never has to wait for chess.json. The title tooltip has the full text. */
+.dorder__luckyname {
+  position: absolute; top: 100%; left: 50%; transform: translateX(-50%); z-index: 2; pointer-events: none;
+  max-width: 1.02rem; padding: 0 .04rem; font-size: max(.11rem, 8px); font-weight: 700; line-height: 1.25; color: var(--gold);
+  background: rgba(8, 11, 10, .8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .dorder__text { display: flex; flex-direction: column; gap: .02rem; min-width: 0; }
 .dorder__name { font-size: .18rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: .06rem; }
 .dorder__ai { font-family: var(--font-num); font-size: .11rem; padding: 0 .04rem; background: #a9c3d8; color: #0b1520; }

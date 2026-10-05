@@ -339,6 +339,32 @@ LOBBY(room) → INFO_CHECK (co-op 25 s; solo and any single-human match untimed 
 ```
 Solo FUNNY has 9 rounds (boss at R9); everything is read from `data/config.json → modes[modeId]`.
 
+### 6.1b 「恭喜发财」 (optional mode, `shared/constants.js LUCKY_MODE`)
+
+An OPTIONAL mode of a room, stacked on the difficulty (`room.lucky`; `room.create { lucky }` and the host-only
+`room.setLucky { lucky }` in LOBBY, both un-readying the other humans like a difficulty change; `room.state.lucky` →
+`Match` `opts.lucky`, off by default — a platform written against the old contract is unaffected). Owner's request
+2026-10-05: every player draws one random tier-5 operator at the start, all different, 缪尔赛思 never drawn, and the draw
+is shown beside each player while the strategies are chosen.
+
+`Match.grantLuckyChess` runs at the top of `enterBandDraft` (before the order is drawn, so the first picker sees the whole
+team's operators) and samples the seats WITHOUT replacement out of the SHARED POOL's tier-`LUCKY_MODE.tier` entries minus
+`LUCKY_MODE.excludedChessIds`. Pool-derived candidates are the load-bearing detail: a mode-disabled bond can ban a tier-5
+operator (标准 bans 烛煌, 史尔特尔, 隐德来希 …), and granting an operator the pool does not hold would take 0 copies, i.e. a
+phantom piece that breaks `left + held == cap` (`invariants.js`) — so the pool is both the eligibility filter and the
+guarantee that every grant succeeds. The draw is granted as a normal gained piece (`PlayerState.acquireChess` → 整备区,
+`source: 'lucky'`); `PlayerState.luckyChess` remembers the base id (cleared by `eliminate`). Randomness comes from
+`rngSetup`, the per-match "setup" stream the bans and the stage already used, whose last draw is at construction — so the
+mode shifts no other stream (`rngShop` / `rngDraft` / `rngWaves` / `rngMeta`), and enabling it changes nothing but the
+draw (`test/lucky-mode.test.js`).
+
+`m.public` carries `lucky: true` plus `players[].lucky` (base id) and `players[].luckyName` from the draft on; both per
+player fields are OMITTED while the mode is off, so an ordinary `m.public` is byte-for-byte what it was. The client draws
+the chip in the 选择策略 order list (`screens/bandDraft.js LuckyOp` → `gameComponents.js UnitThumb`, gold tier-5 frame +
+name, the operator's card stays reachable through the same data lookup) and the mode mark in the pre-game step header
+(`ui/matchChrome.js LuckyTag`) and the room header/footer switch (`screens/room.js LuckyPicker`, `screens/lobby.js
+LuckyCard`).
+
 ### 6.2 Player state (PlayerState.js) — authoritative per player
 
 ```js

@@ -1,5 +1,13 @@
 # 更新记录
 
+## 0.1.4 — 2026-10-05
+
+### 新功能
+
+- **附加模式「恭喜发财」**：在大厅「模拟方式」下面可以给这一局打开（房主在等待室里也能随时开关），和 4 个难度、独立 / 同盟任意组合。开启后每名博士（AI 队友一样）在「选择策略」时各获得一名**随机五阶干员**，直接进整备区，可以正常部署、晋升、出售；同一局里每人拿到的都不重复，抽取范围是本局公共卡池里没被本局禁用的五阶干员，**缪尔赛斯**不在抽取范围内。抽到的干员会显示在「选择策略」左侧决策顺序里每个人的头像旁边（五阶角标 + 名字），可以照着它挑策略；顶栏也会挂一个「恭喜发财」标记。
+  - 抽取用的是本局自己的公共卡池（因此本局禁用的盟约所禁掉的五阶干员不会被抽到），并且真的从卡池里扣掉一份，和普通获得干员一样；随机数取自本局"setup"随机流，开启这个模式不会改变禁约、战场、策略顺序等其它随机结果。
+  - 实现见 `shared/constants.js` 的 `LUCKY_MODE`、`server/match/Match.js` 的 `grantLuckyChess`、`server/lobby.js` 的 `room.setLucky`、`public/js/screens/bandDraft.js` 的 `LuckyOp`；玩法说明见 [docs/PLAYING.md](docs/PLAYING.md)，设计与协议见 [docs/DESIGN.md](docs/DESIGN.md) §6.1b、[docs/META.md](docs/META.md) §1。测试：`test/lucky-mode.test.js`、`test/ui/lucky-mode.test.js`。
+
 ## 0.1.3 — 2026-10-04
 
 修复 0.1.2 发布后玩家和 GitHub 上反馈的问题。每一条先复现，属实的才修，修完经过独立复核再合并。规则对照官方数据和 PRTS 核对；查不到出处的标了推断，详见 [docs/DESIGN.md](docs/DESIGN.md) §23。有意和官方不同的几条写在下面。

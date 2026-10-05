@@ -113,6 +113,33 @@
 .mode-card.is-selected .mode-card__check { opacity: 1; transform: none; }
 @keyframes card-in { from { opacity: 0; transform: translateY(.14rem); } }
 
+/* ---- 「恭喜发财」 optional mode toggle (LUCKY_MODE, js/screens/lobby.js LuckyCard) -------------------------------
+   Sits under the two room types: it is not a room type but a mode stacked on the difficulty, so it reads as a switch. */
+.mode-toggle {
+  position: relative; display: flex; align-items: center; gap: .18rem; width: 100%; text-align: left;
+  padding: .2rem .24rem; background: rgba(12, 15, 14, .82); border: 1px solid var(--line); color: var(--text-md);
+  transition: border-color var(--t-med), background var(--t-med);
+}
+.mode-toggle:disabled { opacity: .55; }
+.mode-toggle:hover { border-color: var(--line-3); }
+.mode-toggle.is-on { border-color: var(--gold); background: linear-gradient(90deg, rgba(255, 198, 0, .12), rgba(12, 15, 14, .82)); }
+.mode-toggle__icon { display: grid; place-items: center; width: .66rem; height: .66rem; flex: none; border: 1px solid var(--line-2); background: rgba(0, 0, 0, .35); color: var(--text-lo); }
+.mode-toggle__icon .icon { width: .38rem; height: .38rem; }
+.mode-toggle.is-on .mode-toggle__icon { background: var(--gold); border-color: var(--gold); color: #1d1400; }
+.mode-toggle__text { display: flex; flex-direction: column; gap: .06rem; min-width: 0; flex: 1; }
+.mode-toggle__name { font-size: .3rem; font-weight: 900; letter-spacing: .08em; line-height: 1.1; }
+.mode-toggle.is-on .mode-toggle__name { color: var(--gold); }
+.mode-toggle__desc { font-size: .16rem; color: var(--text-lo); line-height: 1.55; }
+.mode-toggle__switch { position: relative; flex: none; width: .8rem; height: .34rem; border: 1px solid var(--line-2); background: rgba(0, 0, 0, .4); }
+.mode-toggle__switch i { position: absolute; left: .03rem; top: .03rem; width: .26rem; height: .26rem; background: var(--text-dim); transition: transform var(--t-med) var(--ease-out), background var(--t-med); }
+.mode-toggle.is-on .mode-toggle__switch { border-color: var(--gold); }
+.mode-toggle.is-on .mode-toggle__switch i { transform: translateX(.44rem); background: var(--gold); }
+.mode-toggle__state { flex: none; font-size: .15rem; color: var(--text-dim); }
+.mode-toggle.is-on .mode-toggle__state { color: var(--gold); font-weight: 700; }
+.mode-toggle__hint { margin: .06rem 0 .34rem; font-size: .14rem; line-height: 1.6; color: var(--text-dim); }
+.create-box__lucky { display: inline-flex; align-items: center; gap: .04rem; margin-left: .12rem; color: var(--gold); font-weight: 700; }
+.create-box__lucky .icon { width: .18rem; height: .18rem; }
+
 /* ---- join panel ------------------------------------------------------------------------------------ */
 .join-panel .panel__body { display: flex; flex-direction: column; gap: .14rem; padding: .22rem .26rem .18rem; }
 .join-row { display: flex; gap: .16rem; align-items: stretch; }

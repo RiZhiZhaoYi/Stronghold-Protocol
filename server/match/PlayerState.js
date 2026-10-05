@@ -104,6 +104,12 @@ export class PlayerState {
     this.alive = true;
     this.lp = 0;
     this.bandId = null;
+    /**
+     * 「恭喜发财」 (shared/constants.js LUCKY_MODE, room.lucky): the base chess id of the tier-5 operator this seat drew
+     * at the strategy draft (Match.grantLuckyChess), or null while the mode is off / before the draw. m.public carries
+     * it as `players[].lucky` so the 选择策略 order list can show it next to the player.
+     */
+    this.luckyChess = null;
     this.funds = 0;
     this.pendingFunds = 0;
     this.ready = false;
@@ -1503,6 +1509,8 @@ export class PlayerState {
     this.alive = false;
     this.ready = false;
     this.eliminatedRound = round;
+    // the 「恭喜发财」 draw marker goes with the pieces (m.public drops the row's lucky chip with it)
+    this.luckyChess = null;
     const all = [];
     for (const p of this.board.values()) all.push(p);
     for (const p of this.hand) if (p) all.push(p);

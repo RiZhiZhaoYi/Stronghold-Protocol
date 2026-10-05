@@ -19,8 +19,9 @@
 // never touches the highlighted band or the buttons.
 
 import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
+import { LUCKY_MODE } from '../../../shared/constants.js';
 import { html, Button, Icon, MicroLabel, useTicker, secondsLeft } from '../ui/components.js';
-import { useGameData, BandIcon, RichText, PlayerAvatar, LpTower, Sprite } from '../ui/gameComponents.js';
+import { useGameData, BandIcon, RichText, PlayerAvatar, LpTower, Sprite, UnitThumb } from '../ui/gameComponents.js';
 import { StepHeader, ExitModal } from '../ui/matchChrome.js';
 import { MatchInfoDialog, matchInfoModel } from '../ui/matchInfo.js';
 import { actions, act } from '../ui/gameActions.js';
@@ -40,6 +41,22 @@ export function BandOffTag({ names = [] }) {
 export function BandOffNote({ names = [] }) {
   if (!names.length) return null;
   return html`<p class="draft-detail__off" role="note" aria-label=${bandOffLine(names)}><${Icon} name="info" /><span>本局禁用${names.map((n, i) => html`<span key=${i}>【<s class="draft-detail__offname">${n}</s>】</span>`)}盟约，此策略效果可能无法发挥</span></p>`;
+}
+
+/**
+ * 「恭喜发财」 (shared/constants.js LUCKY_MODE): the operator a player drew at the start of this match, shown next to them
+ * in the 选择策略 order list so the strategy can be picked around it (m.public players[].lucky / luckyName,
+ * Match.grantLuckyChess). Nothing while the mode is off or before the draw.
+ * @param {{ player: any, size?: 'xs'|'sm' }} props
+ */
+export function LuckyOp({ player, size = 'xs' }) {
+  const id = player?.lucky;
+  if (typeof id !== 'string' || !id) return null;
+  const name = player.luckyName || id;
+  return html`<span class="dorder__lucky" title=${`${LUCKY_MODE.name}：开局随机五阶干员 ${name}`} aria-label=${`开局随机五阶干员 ${name}`} data-lucky=${id}>
+    <${UnitThumb} kind="chess" id=${id} size=${size} />
+    <b class="dorder__luckyname">${name}</b>
+  </span>`;
 }
 
 /**
@@ -260,6 +277,7 @@ export function BandDraftScreen() {
           return html`<div key=${p.playerId} class=${cx('dorder', cur && 'is-cur', picked && 'is-done', p.playerId === myId && 'is-self')}>
             ${!solo ? html`<span class="dorder__idx num">${i + 1}</span>` : null}
             <${PlayerAvatar} player=${p} self=${p.playerId === myId} />
+            <${LuckyOp} player=${p} />
             <div class="dorder__text">
               <b class="dorder__name">${p.name || '博士'}${p.isBot ? html`<span class="dorder__ai">AI</span>` : null}</b>
               <span class="dorder__state">${picked ? html`<span class="t-mint">${pband?.name || '已选择'}</span>`

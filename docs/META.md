@@ -54,6 +54,20 @@ LOBBY → INFO_CHECK (co-op 25 s; solo and single-human matches untimed; all hum
 → RESULT (m.result to every human, then onEnd once)
 ```
 
+**「恭喜发财」 (optional mode, `opts.lucky` / `room.lucky`).** A room may stack the mode on any difficulty (host-only
+`room.create { lucky }` / `room.setLucky { lucky }`; `room.state.lucky` → `Match` opts.lucky, off by default). At the top
+of `enterBandDraft` — before the draft order is drawn and before the first turn — `Match.grantLuckyChess` samples one
+operator per seat WITHOUT replacement (rngSetup, the "setup" stream the bans and the stage already used; nothing else
+draws from it after construction, so no other stream shifts) and grants each as a normal gained piece
+(`PlayerState.acquireChess` → the 整备区, one shared-pool copy). The candidates are the shared pool's own entries of
+`LUCKY_MODE.tier` (5) minus `LUCKY_MODE.excludedChessIds` (缪尔赛思 — a T6 operator, stated for the rule's sake): taking
+them from the pool is what makes every grant real, because a mode-disabled bond can ban a tier-5 operator (标准 bans 烛煌,
+史尔特尔, 隐德来希 …), and a grant from outside the pool would be a `poolCopies: 0` phantom that breaks
+`left + held == cap` (`invariants.js`). The seat remembers it as `ps.luckyChess` (cleared by `eliminate`), and `m.public`
+carries `lucky: true` plus `players[].lucky` / `players[].luckyName` from then on — the 选择策略 order list draws it beside
+each player (`screens/bandDraft.js LuckyOp`), so the strategy is picked around it. Both fields are omitted while the mode
+is off, so an ordinary `m.public` is unchanged. Tests: `test/lucky-mode.test.js`, `test/ui/lucky-mode.test.js`.
+
 **Deploy field (user playtest #5 item 7).** From the ROUND_START of a boss round (最终攻势 / 隐秘核心) a player deploys on
 its half of the boss field (`Match.deployFieldOf` → `'bossL'`, or `'bossR'` for the second player of a seat pair — the
 same pairing as the fields, `bossWaves` / `Match.bossGroupOf`, planned in `startRound` BEFORE the players' round start

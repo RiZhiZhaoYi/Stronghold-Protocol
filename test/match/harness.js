@@ -5,6 +5,7 @@
 //
 // Options: mode, difficulty, humans (count) | seats (explicit), bots, spectators (spectator seat ids, opts.spectators),
 // seed, matchNo (the room's match number: part of the battleId prefix), data (default: real data/*.json),
+// lucky (「恭喜发财」: every player draws one distinct random tier-5 operator at the strategy draft),
 // fake (true → test/match/fakeBattle.js as BattleClass), script (FakeBattle.script), registry, instant (virtual
 // scheduler runs battles synchronously; default true), timerScale, battleContent, botRehearsal (default 0),
 // botSliceMs (bot rehearsal slice budget; default: unbounded in virtual time).
@@ -56,6 +57,8 @@ export function makeMatch(o = {}) {
   }
   h.m = new Match({
     roomCode: 'TEST', mode, difficulty, seats, spectators: o.spectators, seed: o.seed ?? 1, matchNo: o.matchNo, data: o.data ?? DATA, log,
+    // 「恭喜发财」 (LUCKY_MODE): the room's optional mode, off unless a test asks for it
+    lucky: o.lucky ?? false,
     send: (id, msg) => {
       for (const fn of h.onSend) fn(id, msg);
       if (msg.t === 'b.snap' || msg.t === 'b.ev') { h.frames++; if (!captureFrames) return true; }

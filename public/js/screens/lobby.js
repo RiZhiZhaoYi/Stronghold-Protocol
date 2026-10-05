@@ -10,7 +10,7 @@
 // plays 战场#01, 险境 draws one of 8, 绝境 / 终极 one of 7 (m01 excluded).
 
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
-import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, ROOM_CODE_LEN, MAX_SEATS, MAX_SPECTATORS, modeIdFor } from '../../../shared/constants.js';
+import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, ROOM_CODE_LEN, MAX_SEATS, MAX_SPECTATORS, modeIdFor, LUCKY_MODE } from '../../../shared/constants.js';
 import { html, Button, Icon, MicroLabel, Panel, TextField, PingPill, AvatarFrame, Tooltip, Spinner, DifficultyIcon, doctorNo } from '../ui/components.js';
 import { toast, toastError } from '../ui/toasts.js';
 import { GuideButton } from '../ui/guide.js';
@@ -208,6 +208,26 @@ function ModeCard({ card, selected, onSelect }) {
   </button>`;
 }
 
+/**
+ * 「恭喜发财」 (shared/constants.js LUCKY_MODE): the optional mode toggle under the two room types. It stacks on any
+ * difficulty and works in both room types, so it is not a third room type; room.create sends it along and the host can
+ * still change it in the room (room.setLucky).
+ * @param {{ on: boolean, disabled?: boolean, onToggle: (on: boolean) => void }} props
+ */
+function LuckyCard({ on, disabled = false, onToggle }) {
+  return html`<button type="button" class=${`mode-toggle brackets${on ? ' is-on' : ''}`} disabled=${disabled}
+      aria-pressed=${on ? 'true' : 'false'} onClick=${() => onToggle(!on)}>
+    <span class="mode-toggle__icon"><${Icon} name="crown" /></span>
+    <span class="mode-toggle__text">
+      <${MicroLabel} tone=${on ? 'gold' : undefined}>${LUCKY_MODE.en}<//>
+      <span class="mode-toggle__name">${LUCKY_MODE.name}</span>
+      <span class="mode-toggle__desc">${LUCKY_MODE.desc}</span>
+    </span>
+    <span class="mode-toggle__switch" aria-hidden="true"><i></i></span>
+    <span class="mode-toggle__state">${on ? '已开启' : '未开启'}</span>
+  </button>`;
+}
+
 function DifficultyCard({ roomMode, difficulty, selected, onSelect }) {
   const info = difficultyInfo(roomMode, difficulty);
   return html`<button type="button" class=${`diff-card${selected ? ' is-selected' : ''}`}
@@ -240,6 +260,8 @@ export function LobbyScreen() {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(null);
   const [recent] = useState(recentRooms);
+  // 「恭喜发财」 (LUCKY_MODE): remembered like the mode and difficulty — it applies to the next room created
+  const [lucky, setLucky] = useState(() => loadPref('lobby.lucky', false) === true);
   const alive = useRef(true);
   const inFlight = useRef(false); // synchronous guard against double clicks (state updates are async)
   useEffect(() => () => { alive.current = false; }, []);
@@ -249,6 +271,7 @@ export function LobbyScreen() {
 
   const pickMode = (m) => { setRoomMode(m); savePref('lobby.mode', m); };
   const pickDifficulty = (d) => { setDifficulty(d); savePref('lobby.difficulty', d); };
+  const pickLucky = (on) => { setLucky(on); savePref('lobby.lucky', on); };
 
   const run = async (kind, fn) => {
     if (inFlight.current) return;
@@ -260,7 +283,7 @@ export function LobbyScreen() {
       if (alive.current) setBusy(null);
     }
   };
-  const create = () => run('create', () => net.request('room.create', { mode: roomMode, difficulty }));
+  const create = () => run('create', () => net.request('room.create', { mode: roomMode, difficulty, lucky }));
   const join = (c = code) => {
     // `onClick=${join}` hands the click EVENT as the first argument, and a default parameter only applies to
     // `undefined` — codeArg keeps an event target out of the key and falls back to the input field
@@ -321,6 +344,11 @@ export function LobbyScreen() {
         <div class="mode-cards">
           ${MODE_CARDS.map((c) => html`<${ModeCard} key=${c.id} card=${c} selected=${roomMode === c.id} onSelect=${pickMode} />`)}
         </div>
+        <div class="section-label"><span class="section-label__idx num">·</span>附加模式<${MicroLabel}>OPTIONAL MODE<//></div>
+        <${LuckyCard} on=${lucky} disabled=${!online} onToggle=${pickLucky} />
+        <p class="mode-toggle__hint">${lucky
+          ? `${LUCKY_MODE.name}已开启：${LUCKY_MODE.effects.join(' · ')}`
+          : `可在任意难度上开启：${LUCKY_MODE.effects.join(' · ')}`}</p>
 
         <div class="section-label"><span class="section-label__idx num">03</span>加入同盟<${MicroLabel}>JOIN WITH ALLIANCE KEY<//></div>
         <${Panel} class="join-panel" tone="amber">
@@ -355,7 +383,8 @@ export function LobbyScreen() {
           <//>
           <div class="create-box__hint">
             ${online
-              ? html`<span>${roomMode === 'solo' ? '创建后即可开始模拟' : '创建后可邀请好友或添加 AI 队友'}</span>`
+              ? html`<span>${roomMode === 'solo' ? '创建后即可开始模拟' : '创建后可邀请好友或添加 AI 队友'}</span>
+                ${lucky ? html`<span class="create-box__lucky"><${Icon} name="crown" />${LUCKY_MODE.name}</span>` : null}`
               : html`<${Spinner} size="sm" label="CONNECTING" />`}
           </div>
         </div>
