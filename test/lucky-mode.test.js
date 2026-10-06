@@ -31,9 +31,16 @@ const candidatesOf = (m) => [...m.pool.entries]
   .map(([id]) => id)
   .sort();
 
-/** Reach BAND_DRAFT of a lucky (or plain) match. */
-function draftOf(o = {}) {
+/** Reach INFO_CHECK of a lucky (or plain) match: the phase the draw is published in (owner's decision 2026-10-06). */
+function briefingOf(o = {}) {
   const h = makeMatch({ mode: 'coop', humans: 3, bots: 1, seed: 42, ...o }).start();
+  assert.equal(h.m.phase, PHASE.INFO_CHECK);
+  return h;
+}
+
+/** Reach BAND_DRAFT of a lucky (or plain) match (every human confirms the briefing). */
+function draftOf(o = {}) {
+  const h = briefingOf(o);
   for (const ps of h.m.players.values()) if (!ps.isBot) h.m.handle(ps.playerId, { t: 'g.infoReady' });
   h.sched.advance(1);
   assert.equal(h.m.phase, PHASE.BAND_DRAFT);
@@ -88,6 +95,47 @@ describe('「恭喜发财」: the opening draw (engine)', () => {
     h.m.dispose();
   });
 
+  test('the draw is already published in 确认本局信息 (owner\'s decision 2026-10-06: earlier than the draft)', () => {
+    const h = briefingOf({ seed: 3, lucky: true });
+    const pub = h.m.publicView();
+    assert.equal(pub.phase, PHASE.INFO_CHECK);
+    assert.equal(pub.lucky, true, 'the mode flag is on from the briefing on');
+    const okay = new Set(candidatesOf(h.m));
+    const drawn = [];
+    for (const p of pub.players) {
+      assert.ok(p.lucky, `${p.playerId} has no draw at the briefing`);
+      assert.equal(p.luckyName, DATA.chess[p.lucky].name);
+      assert.ok(okay.has(p.lucky));
+      drawn.push(p.lucky);
+      // the piece is in the 整备区 from the briefing on, and the board is still empty
+      const ps = h.m.players.get(p.playerId);
+      assert.deepEqual(ps.hand.filter(Boolean).map((x) => x.id), [ps.luckyChess]);
+      assert.equal(ps.board.size, 0);
+    }
+    assert.equal(new Set(drawn).size, drawn.length, 'still all different');
+    // and it stays put across the phase change into the draft
+    for (const ps of h.m.players.values()) if (!ps.isBot) h.m.handle(ps.playerId, { t: 'g.infoReady' });
+    h.sched.advance(1);
+    assert.equal(h.m.phase, PHASE.BAND_DRAFT);
+    assert.deepEqual(h.m.publicView().players.map((p) => p.lucky), drawn);
+    h.invariants();
+    h.m.dispose();
+  });
+
+  test('the draw happens once: entering INFO_CHECK again (a new draw) never repeats for a seat that has one', () => {
+    const h = briefingOf({ seed: 6, lucky: true });
+    const before = [...h.m.players.values()].map((ps) => ps.luckyChess);
+    assert.ok(before.every(Boolean));
+    // re-running the grant is a no-op for every seat that already has one (it is guarded by ps.luckyChess)
+    h.m.grantLuckyChess();
+    assert.deepEqual([...h.m.players.values()].map((ps) => ps.luckyChess), before);
+    for (const ps of h.m.players.values()) {
+      assert.equal([...ps.hand, ...ps.temp, ...ps.board.values()].filter((p) => p && p.kind === 'chess').length, 1);
+    }
+    h.invariants();
+    h.m.dispose();
+  });
+
   test('m.public carries the draw (id + name) next to every player while the strategies are chosen', () => {
     const h = draftOf({ seed: 3, lucky: true });
     const pub = h.m.publicView();
@@ -120,7 +168,7 @@ describe('「恭喜发财」: the opening draw (engine)', () => {
     h.m.dispose();
   });
 
-  test('the draw happens exactly once, at the draft — not again at round start', () => {
+  test('the draw happens exactly once, at the briefing — not again at round start', () => {
     const h = draftOf({ seed: 11, lucky: true }).autoHumans();
     const before = [...h.m.players.values()].map((ps) => ps.luckyChess);
     h.run(() => h.m.round >= 1);
@@ -285,7 +333,7 @@ describe('「恭喜发财」: the lobby switch', () => {
     await err(a, { t: 'room.setLucky', lucky: 1 }, ERR.BAD_MSG);
   });
 
-  test('「恭喜发财」 over the wire: the host turns it on and the draw shows up in m.public (real match)', async () => {
+  test('「恭喜发财」 over the wire: the host turns it on and the draw shows up in the briefing (real match)', async () => {
     // The stub match ends as soon as everyone confirms the briefing, so this one runs the real MatchClass.
     const real = await startServer({ port: 0, host: '127.0.0.1', log: quiet, seedFn: () => 4242 });
     try {
@@ -295,12 +343,9 @@ describe('「恭喜发财」: the lobby switch', () => {
       await ok(host, { t: 'room.create', mode: 'solo', difficulty: 'FUNNY', lucky: true });
       await host.waitFor('room.state', (s) => s.hostId === host.id && s.lucky === true);
       await ok(host, { t: 'room.start' });
-      await host.waitFor('m.public', (p) => p.phase === PHASE.INFO_CHECK, 5000);
-      await ok(host, { t: 'g.infoReady' }); // solo: the player confirms the briefing (no timer)
-      // every m.public from here on is a lucky one: find the draft frame carrying the draw
-      const pub = await host.waitFor('m.public', (p) => p.lucky === true && p.players.some((x) => x.playerId === host.id && x.lucky), 5000);
+      // the draw is published while the briefing is up — before the player confirms anything (owner's decision 2026-10-06)
+      const pub = await host.waitFor('m.public', (p) => p.phase === PHASE.INFO_CHECK && p.lucky === true && p.players.some((x) => x.playerId === host.id && x.lucky), 5000);
       assert.equal(pub.lucky, true);
-      assert.equal(pub.phase, PHASE.BAND_DRAFT, 'the draw is published from the strategy draft on');
       const me = pub.players.find((p) => p.playerId === host.id);
       assert.equal(DATA.chess[me.lucky].tier, LUCKY_MODE.tier, `drew ${me.lucky}`);
       assert.notEqual(me.lucky, MLYSS);
@@ -308,6 +353,10 @@ describe('「恭喜发财」: the lobby switch', () => {
       // the piece is in the hand like any other gain
       const priv = await host.waitFor('m.private', (p) => (p.hand || []).some((x) => x && x.id === me.lucky), 3000);
       assert.ok(priv.hand.some((x) => x && x.id === me.lucky));
+      // … and it is still there after the briefing, in the strategy draft
+      await ok(host, { t: 'g.infoReady' }); // solo: the player confirms the briefing (no timer)
+      const draft = await host.waitFor('m.public', (p) => p.phase === PHASE.BAND_DRAFT && p.lucky === true, 5000);
+      assert.equal(draft.players.find((p) => p.playerId === host.id).lucky, me.lucky, 'the same operator in the draft');
       await host.terminate();
     } finally {
       await real.close();

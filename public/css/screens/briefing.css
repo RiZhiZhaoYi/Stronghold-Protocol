@@ -100,3 +100,13 @@
 .brief-ready__pips i .icon { width: 100%; height: 100%; }
 .brief-ready__pips i.on { color: var(--mint-400); filter: drop-shadow(0 0 .06rem rgba(23, 249, 183, .6)); }
 .brief-ready__pips i.me { border-bottom: 2px solid var(--mint-700); }
+/* 「恭喜发财」 (LUCKY_MODE, screens/briefing.js): a player's opening draw replaces the person pip — thumbnail above, the
+   operator's name under it (the same gold tier-5 frame as the 选择策略 list), and 已就绪 still shows as the mint halo. */
+.brief-ready__pips i.has-lucky { width: auto; min-width: 1.1rem; height: auto; display: flex; flex-direction: column; gap: .02rem; }
+.brief-ready__pips i.has-lucky .uthumb { --ut: max(.42rem, 24px); }
+.brief-ready__pips i.has-lucky.on { filter: drop-shadow(0 0 .07rem rgba(23, 249, 183, .7)); }
+.brief-ready__lucky {
+  max-width: 1.1rem; font-size: max(.12rem, 8px); font-weight: 700; line-height: 1.2; color: var(--text-md);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.brief-ready__pips i.has-lucky.on .brief-ready__lucky { color: var(--mint-400); }

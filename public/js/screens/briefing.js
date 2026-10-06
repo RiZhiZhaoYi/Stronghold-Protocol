@@ -5,8 +5,9 @@
 // avatars — is ui/matchInfo.js MatchInfo, the same blocks the strategy draft's 本局信息 dialog shows (screens/bandDraft.js).
 
 import { useState } from '../../vendor/hooks.module.js';
+import { LUCKY_MODE } from '../../../shared/constants.js';
 import { html, Button, Icon, MicroLabel } from '../ui/components.js';
-import { useGameData, Img, RichText } from '../ui/gameComponents.js';
+import { useGameData, Img, RichText, UnitThumb } from '../ui/gameComponents.js';
 import { StepHeader, ExitModal } from '../ui/matchChrome.js';
 import { MatchInfo, matchInfoModel } from '../ui/matchInfo.js';
 import { LoadoutButton } from './loadout.js';
@@ -90,7 +91,9 @@ export function BriefingScreen() {
       <${LoadoutButton} from="briefing" size="lg" class="brief-loadout" />
       <div class="brief-ready">
         <span class="brief-ready__txt">已就绪 <b class="num">${readyN}</b><span class="num">/${players.length}</span></span>
-        <span class="brief-ready__pips">${players.map((p) => html`<i key=${p.playerId} class=${cx(p.ready && 'on', p.playerId === myId && 'me')} title=${p.name}><${Icon} name="user" /></i>`)}</span>
+        <span class="brief-ready__pips">${players.map((p) => html`<i key=${p.playerId} class=${cx(p.ready && 'on', p.playerId === myId && 'me', p.lucky && 'has-lucky')}
+          title=${p.lucky ? `${p.name}：${LUCKY_MODE.name} 开局随机五阶干员 ${p.luckyName || p.lucky}` : p.name}>
+          ${p.lucky ? html`<${UnitThumb} kind="chess" id=${p.lucky} size="sm" /><b class="brief-ready__lucky">${p.luckyName || p.lucky}</b>` : html`<${Icon} name="user" />`}</i>`)}</span>
       </div>
       <${Button} variant="primary" size="xl" icon=${me?.ready ? 'check' : me ? 'play' : 'eye'} active=${!!me?.ready} loading=${busy}
         disabled=${!!me?.ready || !me} onClick=${ready}>${me?.ready ? '已就绪' : me ? '准备就绪' : '观战中'}<//>

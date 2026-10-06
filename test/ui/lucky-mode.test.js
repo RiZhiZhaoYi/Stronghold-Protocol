@@ -97,3 +97,20 @@ describe('「恭喜发财」: the pre-game header mark', () => {
     assert.match(v.props.title, /随机五阶干员/);
   });
 });
+
+describe('「恭喜发财」: the mode copy never names the excluded operator', () => {
+  test('the advertised effects list is only about the draw (owner\'s decision 2026-10-06)', () => {
+    // the lobby card / room briefing hint is built from LUCKY_MODE.effects (LuckyCard, screens/lobby.js)
+    const text = [LUCKY_MODE.name, LUCKY_MODE.en, LUCKY_MODE.desc, ...LUCKY_MODE.effects].join(' | ');
+    assert.equal(text.includes('缪尔赛斯'), false, 'the exclusion is an engine rule, not UI copy');
+    assert.equal(text.includes('不包含'), false);
+    assert.equal(text.includes('不含'), false);
+    assert.match(text, /随机五阶干员/);
+    assert.match(text, /不重复/);
+  });
+
+  test('the rule itself still exists and is applied (only the wording is gone)', () => {
+    assert.ok(LUCKY_MODE.excludedChessIds.length >= 1, 'the exclusion list is still populated');
+    assert.ok(LUCKY_MODE.excludedChessIds.includes('chess_char_6_11_a'));
+  });
+});

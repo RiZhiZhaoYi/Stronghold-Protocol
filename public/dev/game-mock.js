@@ -276,6 +276,19 @@ function mockLoadout(board, slots) {
 }
 
 // ---- phases ---------------------------------------------------------------------------------------------------------
+/**
+ * 「恭喜发财」 (shared/constants.js LUCKY_MODE, `?variant=lucky`): the opening draws the server publishes as m.public
+ * `lucky` / `players[].lucky` / `luckyName` — one distinct tier-5 operator per player, from the LIVE_CHECK phase on
+ * (the briefing's ready pips show them, and the strategy draft's order list too).
+ * @param {any} pub the mock m.public
+ */
+function applyLuckyDraw(pub) {
+  if (!VARIANTS.has('lucky')) return;
+  pub.lucky = true;
+  const pool = shuffle(visibleChess(LUCKY_MODE.tier).filter((c) => !LUCKY_MODE.excludedChessIds.includes(c.chessId)));
+  pub.players.forEach((p, i) => { const c = pool[i % pool.length]; if (c) { p.lucky = c.chessId; p.luckyName = c.name; } });
+}
+
 function setPhase(phase, variant) {
   stopBattle();
   buildState();
@@ -300,18 +313,13 @@ function setPhase(phase, variant) {
       pub.round = 0; pub.deadline = Date.now() + 21000;
       pub.players.forEach((p, i) => { p.ready = i === 1 || i === 2; p.status = p.ready ? 'ready' : 'deciding'; p.bandId = null; p.lp = 0; });
       S.priv.bandId = null;
+      applyLuckyDraw(pub);
       break;
     case PHASE.BAND_DRAFT:
       pub.round = 0; pub.deadline = Date.now() + 9000;
       pub.players.forEach((p) => { p.bandId = null; p.status = 'deciding'; p.ready = false; });
       S.priv.bandId = null;
-      // 「恭喜发财」 (shared/constants.js LUCKY_MODE, `?variant=lucky`): the opening draws the server publishes as
-      // m.public lucky / players[].lucky — one distinct tier-5 operator per player, 缪尔赛思 never among them
-      if (VARIANTS.has('lucky')) {
-        pub.lucky = true;
-        const pool = shuffle(visibleChess(LUCKY_MODE.tier).filter((c) => !LUCKY_MODE.excludedChessIds.includes(c.chessId)));
-        pub.players.forEach((p, i) => { const c = pool[i % pool.length]; if (c) { p.lucky = c.chessId; p.luckyName = c.name; } });
-      }
+      applyLuckyDraw(pub);
       if (!solo) {
         pub.draft = { order: ['p3', 'p1', 'ai_2', 'p4'], turn: 'p1', picks: { p3: 'band_sarkazb' }, skipsLeft: { p1: 1, p3: 1, ai_2: 1, p4: 1 }, turnDeadline: Date.now() + 9000 };
         pub.players.find((p) => p.playerId === 'p3').bandId = 'band_sarkazb';
@@ -739,6 +747,7 @@ function applyUiVariants() {
 const SWITCH = [
   ['INFO_CHECK', PHASE.INFO_CHECK, ''], ['BAND_DRAFT', PHASE.BAND_DRAFT, ''], ['BAND_DRAFT solo', PHASE.BAND_DRAFT, 'solo'],
   ['BAND_DRAFT 恭喜发财', PHASE.BAND_DRAFT, 'lucky'], ['BAND_DRAFT 恭喜发财 solo', PHASE.BAND_DRAFT, 'solo,lucky'],
+  ['INFO_CHECK 恭喜发财', PHASE.INFO_CHECK, 'lucky'],
   ['BATTLE_CHECK', PHASE.BATTLE_CHECK, ''], ['PREP', PHASE.PREP, ''], ['PREP + reward', PHASE.PREP, 'reward'],
   ['PREP + temp', PHASE.PREP, 'temp'], ['PREP frozen', PHASE.PREP, 'frozen'], ['PREP dead', PHASE.PREP, 'dead'],
   ['PREP boss (L)', PHASE.PREP, 'boss'], ['PREP boss (R)', PHASE.PREP, 'bossR'], ['PREP 标准 同构体 + 调和', PHASE.PREP, 'funny,morph,harmony'],
