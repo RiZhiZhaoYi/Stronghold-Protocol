@@ -63,21 +63,6 @@ LOBBY → INFO_CHECK (co-op 25 s; solo and single-human matches untimed; all hum
 → RESULT (m.result to every human, then onEnd once)
 ```
 
-**「恭喜发财」 (optional mode, `opts.lucky` / `room.lucky`).** A room may stack the mode on any difficulty (host-only
-`room.create { lucky }` / `room.setLucky { lucky }`; `room.state.lucky` → `Match` opts.lucky, off by default). As the
-briefing opens — `enterInfoCheck`, right after its own first flush, one step before the strategy draft — `Match.grantLuckyChess`
-samples one operator per seat WITHOUT replacement (rngSetup, the "setup" stream the bans and the stage already used;
-nothing else draws from it after construction, so no other stream shifts) and grants each as a normal gained piece
-(`PlayerState.acquireChess` → the 整备区, one shared-pool copy). The candidates are the shared pool's own entries of
-`LUCKY_MODE.tier` (5) minus `LUCKY_MODE.excludedChessIds` (the rule the owner asked for; the UI copy deliberately does not
-spell it out): taking them from the pool is what makes every grant real, because a mode-disabled bond can ban a tier-5
-operator (标准 bans 烛煌, 史尔特尔, 隐德来希 …), and a grant from outside the pool would be a `poolCopies: 0` phantom that
-breaks `left + held == cap` (`invariants.js`). The seat remembers it as `ps.luckyChess` (cleared by `eliminate`), and
-`m.public` carries `lucky: true` plus `players[].lucky` / `players[].luckyName` from INFO_CHECK on — the briefing's player
-rows and the 选择策略 order list draw it beside each player (`screens/bandDraft.js LuckyOp`), so the strategy is picked
-around it. Both fields are omitted while the mode is off, so an ordinary `m.public` is unchanged. Tests:
-`test/lucky-mode.test.js`, `test/ui/lucky-mode.test.js`.
-
 **Deploy field (user playtest #5 item 7).** From the ROUND_START of a boss round (最终攻势 / 隐秘核心) a player deploys on
 its half of the boss field (`Match.deployFieldOf` → `'bossL'`, or `'bossR'` for the second player of a seat pair — the
 same pairing as the fields, `bossWaves` / `Match.bossGroupOf`, planned in `startRound` BEFORE the players' round start
@@ -386,7 +371,7 @@ that per garrison with `garrisonHooks(garrison) → hook[]`, e.g. "<进入休整
 | `SERVER_GAIN` 获得时 | `onGain` | the gained piece — run **×2 while 投资人 is active, ×3 at ≥ 100 投资人 layers** |
 | `SERVER_PREP_START` 进入休整期时 | `onRoundStart` | owned chess: board, and hand unless `bbStr.conditionkey === 'character_target_inboard'` |
 | `SERVER_PREP_FIN` 休整期结束时 | `onPrepEnd` | same |
-| `SERVER_REFRESH_SHOP` 刷新时 | `onRefresh` | same — manual refreshes only (`ev.trigger` marks a re-run); 拉普兰德's "本回合首次主动刷新" counts per copy (`incPieceCounter`) |
+| `SERVER_REFRESH_SHOP` 刷新时 | `onRefresh` | same, as they stood when the refresh happened (taken before its first handler: a chess gained during the dispatch — 贾维's gift, the elite it completes — waits for the next refresh; one that left is skipped) — manual refreshes only (`ev.trigger` marks a re-run); 拉普兰德's "本回合首次主动刷新" counts per copy (`incPieceCounter`) |
 | `SERVER_CHESS_SOLD` 售出时 | `onSold` | the sold piece |
 | `SERVER_PRICE` 购买价格 | `onPrice` (first) | the chess in the priced slot (`ctx.source.where === 'shop'`); SERVER_CHESS_PRICE `bb.price` is the discount off the tier price (至简 3 − 2 = 1, 红豆 2 − 1 = 1: both texts say 购买价格为1) |
 | `IN_BATTLE` | — | battle side (server/sim/content/garrisons.js `install`) |
@@ -446,8 +431,10 @@ Writes (all validated, never throw on bad input, never make funds / pools negati
 ### 2.5 Items: consume-on-equip and Arts
 Items whose data `kind` starts with `consume_on_equip` resolve through their `item:` handler's `onEquip` and are
 destroyed (they never take a slot); set `ev.keep = true` to keep the item equipped instead (博士投影 normal), or
-`ev.error = 'BAD_TARGET'` (+ `ev.detail`) to refuse. Without a registered handler the equip is refused
-(`BAD_TARGET 'effect not available'`). Arts (`MAGIC`): `g.art` needs a handler; at most `maxArtsPerRound` (2) per round;
+`ev.error = 'BAD_TARGET'` (+ `ev.detail`) to refuse. On a full carrier the item `replaceUid` names (else the oldest) comes
+off before `onEquip` runs and is destroyed (`onDestroy` reason `replace`) once the effect went through — the carrier keeps
+a free slot, which a kept item takes —, and goes back where it was when the effect refuses (GitHub #263). Without a
+registered handler the equip is refused (`BAD_TARGET 'effect not available'`). Arts (`MAGIC`): `g.art` needs a handler; at most `maxArtsPerRound` (2) per round;
 `ev.targets` are the pieces under the Art's `rangeGrid` at (row, col); set `ev.error` to refuse, `ev.used = false` to keep it.
 Other equipment: 2 slots; a third replaces the equipped item the player picks in the replace dialog — `g.equip
 { itemUid, targetUid, replaceUid }` (research 09 §1.2 `UseEquipUp.unloadInstId`; absent ⇒ the oldest; a `replaceUid` not
@@ -704,11 +691,10 @@ helpers = `unite.js helperOrder` (research 08 §5, PRTS 卫戍协议/帮助 §�
 chosen by most units on the field (downed included) > an active bond > most standing units > seat; the pair ordered by
 units > active bond > Σ active layers > standing > seat (LP plays no part), the first one on the right-hand field
 (colOffset +8, where escaped_multi enters), the other colOffset 0; the escaped template of that size routes the leaked
-enemies by slot class, and the field is the round's stage — its left half is one helper's field, its right half the
-other's — so its water, crates, devices and special tiles are all there (0.2.0 fielded the battle on the template's own
-road map instead, `unite.js uniteStageId`: stages.json `act1autochess_escaped_single` / `_multi`, two road halves joined
-at col 10, no devices; GitHub #41, reverted), each helper's pieces
-on their prep tiles; helpers' operators carry
+enemies by slot class on the round's battlefield — the match stage opened to both halves (`GEO.UNITE_RECT`, cols 0–20),
+its terrain, crates, water, devices, runes and band map characters included, as in 0.1.x (the owner's decision of
+2026-10-07, 「官服保留地形」; 0.2.0 fought it on the escaped levels' own map, the placeholder road every wave template
+carries — GitHub #41, withdrawn), each helper's pieces on their prep tiles; helpers' operators carry
 `{ hpPct, sp }` from `unitsEnd` ("阵地以其当前状态": the HP ratio and the 技力 only — a skill running at the end enters
 switched off; summon pieces `{ sp }`, "召唤物仅修改技力"); an operator knocked out at the end of the helper's own
 combat carries `{ down: true }` (PRTS 卫戍协议/帮助: "部署完成后…上一阶段为退场状态的干员强制退场"): deployed, then forced out

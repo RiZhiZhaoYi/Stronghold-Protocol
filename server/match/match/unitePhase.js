@@ -40,14 +40,10 @@ export class MatchUnite {
   }
 
   /**
-   * Battle options of the 联防 field (helpers' carried end state, the leakers' enemies) on the ROUND'S OWN battlefield
-   * (as 0.1.3 and earlier): it is already the two players' halves side by side — the left half is the helpers' field
-   * (colOffset 0), the right half (colOffset 8, where the escaped_multi routes enter) the other one — so its water,
-   * crates, devices and special tiles are all there. 0.1.4 replaced it with the 联防 template map of data/stages.json
-   * (kind 'unite'; GitHub #41, recorded in the 0.2.0 changelog), which is one bare road: every obstacle and special tile
-   * was gone (user report), so the battlefield is back. Only the ENEMY ROUTES come from the escaped template (waves.js
-   * buildUniteWave). The field meta and the client-run spec carry this stageId, so every viewer draws the same
-   * battlefield.
+   * Battle options of the 联防 field (helpers' carried end state, the leakers' enemies) on the round's battlefield, its
+   * terrain, crates, water, devices and runes included (unite.js header; the owner's decision of 2026-10-07 — 0.2.0's
+   * escaped-level map is withdrawn). The field meta and the client-run spec carry the match stageId, so every viewer
+   * draws the battlefield the boards stand on.
    */
   _uniteOpts(plan, limit) {
     const { wave, players } = uniteBattleOpts(this, plan, limit);

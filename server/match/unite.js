@@ -5,15 +5,14 @@
 // players chosen by most units on the field (downed included) > has an active bond (存疑) > most undowned units, then
 // seat; with 2 helpers the one ranked first by most units > active bond > Σ active bond layers (存疑) > most undowned
 // units "率先迎敌" on the RIGHT-hand field (colOffset +8, where the escaped_multi routes enter), the other keeps the
-// left half (colOffset 0); a lone helper plays escaped_single on its own field. The field is the ROUND'S OWN battlefield
-// — its left half is one helper's field, its right half (the one whose gates the escaped_multi routes enter from) the
-// other's — so its water, crates, devices and special tiles are all there; every helper's pieces on their prep tiles
-// ("按休整期位置部署在场"), the right-hand one shifted 8 columns
-// (the official maps' halves, = the stage config's player_map_lr_offset 8). 0.1.4 built the field on the 联防 template
-// level's own map instead (GitHub #41: data/stages.json act1autochess_escaped_single / _multi, one bare road — every
-// obstacle and special tile was gone, user report), so the round's battlefield is back; only the routes below come from
-// the escaped template. Their operators keep the HP ratio and the SP (技力, stored charges included) from the end of
-// their own combat, nothing else — a skill still running then
+// left half (colOffset 0); a lone helper plays escaped_single on its own field. The field is the round's battlefield —
+// the match stage with its terrain, crates, water, devices and runes — opened to both halves (GEO.UNITE_RECT, cols
+// 0–20; the stage's right half is its left half + 8 columns), every helper's pieces on their prep tiles
+// ("按休整期位置部署在场"), the right-hand one shifted 8 columns (= the stage config's player_map_lr_offset 8): the
+// owner's knowledge of the official mode, 2026-10-07 「官服保留地形」. 0.2.0 fielded it on the escaped levels' own map,
+// an empty road (GitHub #41) — withdrawn in 0.2.1; data/stages.json keeps those two records (kind 'unite'), which no
+// match fields. Their operators keep the HP ratio and
+// the SP (技力, stored charges included) from the end of their own combat, nothing else — a skill still running then
 // enters switched off (BattleResult.unitsEnd → PlayerBattleInput.units[].carryState `{ hpPct, sp }`, "阵地以其当前状态";
 // community report #34 / GitHub #82: it used to restart for free). An operator knocked out at the end of its own combat (alive false) is fielded with
 // `carryState: { down: true }`: PRTS "部署完成后，将对应单位的生命比例、技力修改至与上一阶段结束时相同（召唤物仅修改技力，
