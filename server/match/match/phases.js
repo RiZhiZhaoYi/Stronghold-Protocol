@@ -4,7 +4,8 @@
 // round start).
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
-import { PHASE, ERR } from '../../../shared/constants.js';
+import { PHASE, ERR, LUCKY_MODE } from '../../../shared/constants.js';
+import { msg, dn } from '../../../shared/i18n.js';
 import { buildNormalWave, buildBossWave } from '../waves.js';
 import { pairPlayers } from '../finalAssault.js';
 import { botPickBand } from '../bot.js';
@@ -19,7 +20,64 @@ export class MatchPhases {
     this.markPublic();
     for (const ps of this.order) this.markPrivate(ps);
     this.flush(true);
+    // 「恭喜发财」 (LUCKY_MODE, owner's decision 2026-10-06): the opening draws are made as the briefing opens, so every
+    // player already reads the whole team's operators on 确认本局信息 — one step before the strategy draft and before
+    // anybody picks. After the flush above, so the draw is published by the frames that follow the briefing itself.
+    if (this.lucky) {
+      this.grantLuckyChess();
+      this.markPublic();
+      for (const ps of this.order) this.markPrivate(ps);
+      this.flush(true);
+    }
     this.maybeEndInfo();
+  }
+
+  /**
+   * 「恭喜发财」 (LUCKY_MODE + opts.lucky): hand every player one random operator of `LUCKY_MODE.tier`, all different.
+   *
+   * The candidates are the SHARED POOL's own entries of that tier — visible, not banned for this match (a mode-disabled
+   * bond can ban an operator: with 标准's 10 switched-off bonds 烛煌, 史尔特尔, 隐德来希 … are out) and still holding a copy.
+   * Drawing from the pool is what makes the grant always succeed: an operator the pool does not hold would be granted
+   * with `poolCopies: 0`, i.e. a phantom that breaks the `left + held == cap` accounting (server/match/invariants.js).
+   *
+   * `LUCKY_MODE.excludedChessIds` names the operators that may never be drawn (owner's request: 缪尔赛思 never shows up
+   * as a random operator) — the rule is applied here and simply not advertised in the UI copy.
+   *
+   * The draws are a plain uniform sample without replacement, so the whole team is guaranteed distinct operators, not
+   * merely distinct draws (owner's request: "都不重复"). An AI seat draws like a human. More seats than candidates
+   * (never with the shipped data) simply leaves the last seats without a draw.
+   *
+   * The drawn operator is granted as a normal gained piece (PlayerState.acquireChess → the 整备区, taking a pool copy)
+   * and remembered on the seat (`ps.luckyChess`), which m.public carries as `players[].lucky` / `luckyName` — the client
+   * shows it beside every player from 确认本局信息 on (owner's decision 2026-10-06: the briefing is where the draw first
+   * appears, one step earlier than the strategy draft). Not at ROUND_START: the operator, and the skill chosen for it in
+   * 干员调配, are meant to be readable before the strategies are picked.
+   *
+   * Randomness comes from rngSetup — the per-match "setup" stream the bans and the stage already used. Nothing else draws
+   * from it after construction, so taking these numbers does not shift any other stream (rngShop/rngDraft/rngWaves/rngMeta).
+   */
+  grantLuckyChess() {
+    if (!this.lucky) return;
+    const off = new Set(LUCKY_MODE.excludedChessIds);
+    const candidates = [];
+    for (const [id, e] of this.pool.entries) if (e.tier === LUCKY_MODE.tier && !off.has(id)) candidates.push(id);
+    if (!candidates.length) {
+      this.log.warn?.(`[match ${this.roomCode}] ${LUCKY_MODE.name}: no tier-${LUCKY_MODE.tier} operator in the pool — nothing granted`);
+      return;
+    }
+    this.rngSetup.shuffle(candidates);
+    let i = 0;
+    for (const ps of this.order) {
+      if (i >= candidates.length) break;
+      if (!ps.alive || ps.luckyChess) continue;
+      const id = candidates[i];
+      const piece = ps.acquireChess(id, { source: 'lucky' });
+      if (!piece) continue; // no room / a merge (never for one copy): the candidate stays available
+      i++;
+      ps.luckyChess = this.gd.baseIdOf(piece.id) || id;
+      const got = this.gd.chess(piece.id);
+      this.toast(ps, 'info', msg('{mode}：开局获得{name}', { mode: LUCKY_MODE.name, name: dn(got?.name || ps.luckyChess) }));
+    }
   }
 
   maybeEndInfo() {

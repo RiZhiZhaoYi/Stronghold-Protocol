@@ -65,6 +65,9 @@ export class MatchViews {
       combatMode: this.clientCombat ? 'client' : 'server',
       // solo pause (g.pause, DESIGN §14): the battle, its field clock and every deadline are frozen while true
       paused: !!this.paused,
+      // 「恭喜发财」 (LUCKY_MODE, room.lucky): the optional mode stacked on the difficulty — every player draws one
+      // distinct random tier-5 operator as the briefing opens (players[].lucky names it)
+      lucky: !!this.lucky,
       players: this.order.map((ps) => ({
         playerId: ps.playerId,
         seat: ps.seat,
@@ -87,6 +90,11 @@ export class MatchViews {
         fieldId: this.fieldOf(ps),
         status: this.statusOf(ps),
         autoplay: ps.autoplay,
+        // 「恭喜发财」 (LUCKY_MODE): the operator this player drew as the briefing opened (match/phases.js
+        // grantLuckyChess) + its display name, so the briefing's ready pips and the 选择策略 order list can show it
+        // without waiting for the client's chess data. Omitted entirely while the mode is off or before the draw, so
+        // an ordinary match's m.public is byte-for-byte what it was.
+        ...(ps.luckyChess ? { lucky: ps.luckyChess, luckyName: this.gd.chess(ps.luckyChess)?.name || ps.luckyChess } : {}),
         // the LP this round's own battle will cost at settlement so far (COMBAT / 联防 only, omitted when 0)
         ...this._pendingLpView(ps),
       })),

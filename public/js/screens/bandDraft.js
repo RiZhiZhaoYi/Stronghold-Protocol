@@ -54,8 +54,9 @@ export function BandOffNote({ names = [] }) {
 export function LuckyOp({ player, size = 'xs' }) {
   const id = player?.lucky;
   if (typeof id !== 'string' || !id) return null;
-  const name = player.luckyName || id;
-  return html`<span class="dorder__lucky" title=${`${LUCKY_MODE.name}：开局随机五阶干员 ${name}`} aria-label=${`开局随机五阶干员 ${name}`} data-lucky=${id}>
+  const name = tName(player.luckyName || id);
+  const tip = t('{mode}：开局随机五阶干员 {name}', { mode: t(LUCKY_MODE.name), name });
+  return html`<span class="dorder__lucky" title=${tip} aria-label=${tip} data-lucky=${id}>
     <${UnitThumb} kind="chess" id=${id} size=${size} />
     <b class="dorder__luckyname">${name}</b>
   </span>`;

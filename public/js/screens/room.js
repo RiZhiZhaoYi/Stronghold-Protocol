@@ -184,17 +184,17 @@ function LuckyPicker({ room, isHost, busy, onToggle }) {
   if (!isHost) {
     return html`<div class=${`lucky-pick lucky-pick--ro${on ? ' is-on' : ''}`}>
       <${Icon} name="crown" />
-      <span>${LUCKY_MODE.name}</span>
-      <span class=${`lucky-pick__state${on ? ' is-on' : ''}`}>${on ? '已开启' : '未开启'}</span>
-      <span class="t-dim">由创建者选择</span>
+      <span>${t(LUCKY_MODE.name)}</span>
+      <span class=${`lucky-pick__state${on ? ' is-on' : ''}`}>${on ? t('已开启') : t('未开启')}</span>
+      <span class="t-dim">${t('由创建者选择')}</span>
     </div>`;
   }
   return html`<button type="button" class=${`lucky-pick${on ? ' is-on' : ''}`} aria-pressed=${on ? 'true' : 'false'}
-      disabled=${!!busy} title=${LUCKY_MODE.desc} onClick=${() => onToggle(!on)}>
+      disabled=${!!busy} title=${t(LUCKY_MODE.desc)} onClick=${() => onToggle(!on)}>
     <${Icon} name="crown" />
-    <span>${LUCKY_MODE.name}</span>
+    <span>${t(LUCKY_MODE.name)}</span>
     <span class="lucky-pick__switch" aria-hidden="true"><i></i></span>
-    <span class=${`lucky-pick__state${on ? ' is-on' : ''}`}>${on ? '已开启' : '未开启'}</span>
+    <span class=${`lucky-pick__state${on ? ' is-on' : ''}`}>${on ? t('已开启') : t('未开启')}</span>
   </button>`;
 }
 

@@ -54,6 +54,8 @@ export class PlayerRound {
     this.alive = false;
     this.ready = false;
     this.eliminatedRound = round;
+    // the 「恭喜发财」 draw marker goes with the pieces (m.public drops the row's lucky chip with it)
+    this.luckyChess = null;
     const all = [];
     for (const p of this.board.values()) all.push(p);
     for (const p of this.hand) if (p) all.push(p);

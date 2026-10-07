@@ -5,7 +5,7 @@
 //
 // Options: mode, difficulty, humans (count) | seats (explicit), bots, spectators (spectator seat ids, opts.spectators),
 // seed, matchNo (the room's match number: part of the battleId prefix), data (default: real data/*.json),
-// lucky (「恭喜发财」: every player draws one distinct random tier-5 operator at the strategy draft),
+// lucky (「恭喜发财」: every player draws one distinct random tier-5 operator as the briefing opens, MatchPhases),
 // fake (true → test/match/fakeBattle.js as BattleClass), script (FakeBattle.script), registry, instant (virtual
 // scheduler runs battles synchronously; default true), timerScale, battleContent, botRehearsal (default 0),
 // botSliceMs (bot rehearsal slice budget; default: unbounded in virtual time).

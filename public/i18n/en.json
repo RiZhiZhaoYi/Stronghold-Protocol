@@ -1054,5 +1054,17 @@
   "选择「{name}」的朝向": "Choose {name}'s facing",
   "选择朝向": "Choose a facing",
   "朝向：{dir}": "Facing: {dir}",
-  "开发版 · 不稳定，请勿用于公开服务器": "Development build · unstable, not for public servers"
+  "开发版 · 不稳定，请勿用于公开服务器": "Development build · unstable, not for public servers",
+  "恭喜发财": "Fortune Draw",
+  "每名博士开局各获得一名随机五阶干员，互不重复。": "Every Doctor starts with a random 5-star operator; no two players draw the same one.",
+  "每名博士开局随机获得 1 名五阶干员": "Each Doctor draws one random 5-star operator at the start",
+  "全队不重复": "No two players draw the same operator",
+  "附加模式": "Optional Mode",
+  "已开启": "On",
+  "未开启": "Off",
+  "{mode}已开启：": "{mode} is on: ",
+  "可在任意难度上开启：": "Can be turned on at any difficulty: ",
+  "{mode}：开局随机五阶干员 {name}": "{mode}: opening random 5-star operator {name}",
+  "{name}：{mode} 开局随机五阶干员 {op}": "{name}: {mode} opening random 5-star operator {op}",
+  "{mode}：开局获得{name}": "{mode}: gained {name} at the start"
 }

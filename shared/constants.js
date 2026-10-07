@@ -41,15 +41,18 @@ export const modeIdFor = (roomMode, difficulty) =>
  * line of the mode's UI copy (owner's decision 2026-10-06, "把'不包含缪尔赛斯'删掉").  `tier` is not strictly necessary
  * for 缪尔赛思 (tier 6, so it could never be drawn from the tier-5 pool), but keeping it stated makes the rule explicit
  * and lets the exclusion list hold any operator.
+ *
+ * 0.2.0: the display strings are module-level table entries, so they carry the N_() marker for tools/i18n.mjs and are
+ * rendered through t() where they are shown (shared/i18n.js). An untranslated string falls back to this Chinese text.
  */
 export const LUCKY_MODE = Object.freeze({
   /** room.state / m.public flag name (room.create { lucky }, room.setLucky { lucky }, Match opts.lucky) */
   flag: 'lucky',
   id: 'lucky',
-  name: '恭喜发财',
+  name: N_('恭喜发财'),
   en: 'FORTUNE DRAW',
   /** one-line description (lobby card, room briefing) */
-  desc: '每名博士开局各获得一名随机五阶干员，互不重复。',
+  desc: N_('每名博士开局各获得一名随机五阶干员，互不重复。'),
   /** the tier every player draws from */
   tier: 5,
   /** operators that may never be drawn (name kept in the comment for the data-less case) */
@@ -57,7 +60,7 @@ export const LUCKY_MODE = Object.freeze({
     'chess_char_6_11_a', // 缪尔赛思 (Muelsyse)
   ]),
   /** official-card effects list shown next to the toggle */
-  effects: Object.freeze(['每名博士开局随机获得 1 名五阶干员', '全队不重复']),
+  effects: Object.freeze([N_('每名博士开局随机获得 1 名五阶干员'), N_('全队不重复')]),
 });
 
 export const PHASE = Object.freeze({

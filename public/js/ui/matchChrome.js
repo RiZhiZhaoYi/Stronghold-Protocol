@@ -117,7 +117,7 @@ export function AwayOverlay({ onBack = () => {} }) {
  */
 export function LuckyTag({ pub }) {
   if (!pub || pub.lucky !== true) return null;
-  return html`<span class="lucky-tag" title=${LUCKY_MODE.desc}><${Icon} name="crown" />${LUCKY_MODE.name}</span>`;
+  return html`<span class="lucky-tag" title=${t(LUCKY_MODE.desc)}><${Icon} name="crown" />${t(LUCKY_MODE.name)}</span>`;
 }
 
 /**

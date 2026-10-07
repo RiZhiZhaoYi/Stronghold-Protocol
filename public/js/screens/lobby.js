@@ -228,11 +228,11 @@ function LuckyCard({ on, disabled = false, onToggle }) {
     <span class="mode-toggle__icon"><${Icon} name="crown" /></span>
     <span class="mode-toggle__text">
       <${MicroLabel} tone=${on ? 'gold' : undefined}>${LUCKY_MODE.en}<//>
-      <span class="mode-toggle__name">${LUCKY_MODE.name}</span>
-      <span class="mode-toggle__desc">${LUCKY_MODE.desc}</span>
+      <span class="mode-toggle__name">${t(LUCKY_MODE.name)}</span>
+      <span class="mode-toggle__desc">${t(LUCKY_MODE.desc)}</span>
     </span>
     <span class="mode-toggle__switch" aria-hidden="true"><i></i></span>
-    <span class="mode-toggle__state">${on ? '已开启' : '未开启'}</span>
+    <span class="mode-toggle__state">${on ? t('已开启') : t('未开启')}</span>
   </button>`;
 }
 
@@ -352,11 +352,11 @@ export function LobbyScreen() {
         <div class="mode-cards">
           ${MODE_CARDS.map((c) => html`<${ModeCard} key=${c.id} card=${c} selected=${roomMode === c.id} onSelect=${pickMode} />`)}
         </div>
-        <div class="section-label"><span class="section-label__idx num">·</span>附加模式<${MicroLabel}>OPTIONAL MODE<//></div>
+        <div class="section-label"><span class="section-label__idx num">·</span>${t('附加模式')}<${MicroLabel}>OPTIONAL MODE<//></div>
         <${LuckyCard} on=${lucky} disabled=${!online} onToggle=${pickLucky} />
         <p class="mode-toggle__hint">${lucky
-          ? `${LUCKY_MODE.name}已开启：${LUCKY_MODE.effects.join(' · ')}`
-          : `可在任意难度上开启：${LUCKY_MODE.effects.join(' · ')}`}</p>
+          ? t('{mode}已开启：', { mode: t(LUCKY_MODE.name) }) + LUCKY_MODE.effects.map((e) => t(e)).join(' · ')
+          : t('可在任意难度上开启：') + LUCKY_MODE.effects.map((e) => t(e)).join(' · ')}</p>
 
         <div class="section-label"><span class="section-label__idx num">03</span>${t('加入同盟')}<${MicroLabel}>JOIN WITH ALLIANCE KEY<//></div>
         <${Panel} class="join-panel" tone="amber">
