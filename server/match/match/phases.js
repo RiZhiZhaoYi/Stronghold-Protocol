@@ -36,7 +36,10 @@ export class MatchPhases {
    * 「恭喜发财」 (LUCKY_MODE + opts.lucky): hand every player one random operator of `LUCKY_MODE.tier`, all different.
    *
    * The candidates are the SHARED POOL's own entries of that tier — visible, not banned for this match (a mode-disabled
-   * bond can ban an operator: with 标准's 10 switched-off bonds 烛煌, 史尔特尔, 隐德来希 … are out) and still holding a copy.
+   * bond can ban an operator: with 标准's 10 switched-off bonds 烛煌, 史尔特尔, 隐德来希 … are out) and still holding a
+   * copy — the `e.left > 0` in the filter below, because pool entries carry the raw SIGNED balance and since 0.2.4 an
+   * overdraw (player/acquire.js takes with `{ overdraw: true }`) can drive it negative, so the tier alone no longer
+   * implies a copy is there.
    * Drawing from the pool is what makes the grant always succeed: an operator the pool does not hold would be granted
    * with `poolCopies: 0`, i.e. a phantom that breaks the `left + held == cap` accounting (server/match/invariants.js).
    *
@@ -60,7 +63,7 @@ export class MatchPhases {
     if (!this.lucky) return;
     const off = new Set(LUCKY_MODE.excludedChessIds);
     const candidates = [];
-    for (const [id, e] of this.pool.entries) if (e.tier === LUCKY_MODE.tier && !off.has(id)) candidates.push(id);
+    for (const [id, e] of this.pool.entries) if (e.tier === LUCKY_MODE.tier && e.left > 0 && !off.has(id)) candidates.push(id);
     if (!candidates.length) {
       this.log.warn?.(`[match ${this.roomCode}] ${LUCKY_MODE.name}: no tier-${LUCKY_MODE.tier} operator in the pool — nothing granted`);
       return;
