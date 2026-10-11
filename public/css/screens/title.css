@@ -145,6 +145,11 @@
   flex-direction: column;
   align-items: center;
   margin-top: -.3rem;
+  /* 矮屏兜底（本 fork）：visible height 小于画布 10.8rem 时（css/theme.css 的根字号被 40 px 下限卡住，或浏览器不认
+     svh），这一列比屏幕高，最底下的 ⚙ / ⛶ 一行就落在屏幕外，而且哪里都滚不动。让 main 自己可滚动就能滑到它们；
+     .title-bg / .title-corner / .title-foot 都在 main 之外，位置不变。空间够时 auto 不出现滚动条，与上游一致。 */
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .emblem { position: relative; display: flex; align-items: center; gap: .26rem; margin-bottom: .26rem; animation: rise-in 600ms var(--ease-out) backwards; }

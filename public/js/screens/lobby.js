@@ -19,7 +19,7 @@ import { toast, toastError } from '../ui/toasts.js';
 import { GuideButton } from '../ui/guide.js';
 import { openStats } from './stats.js';
 import { SettingsButton } from '../ui/settings.js';
-import { PwaInstallButton } from '../ui/device.js';
+import { FullscreenButton, PwaInstallButton } from '../ui/device.js';
 import { LoadoutButton } from './loadout.js';
 import { net, identity } from '../net.js';
 import { store, useStore, shallowEqual, loadPref, savePref } from '../store.js';
@@ -337,6 +337,7 @@ export function LobbyScreen() {
           <${SettingsButton} class="lobby-settings" variant="secondary" square=${true} />
           <${GuideButton} class="lobby-guide" variant="secondary" square=${true} />
           <${PwaInstallButton} class="lobby-pwa" square=${true} />
+          <${FullscreenButton} class="lobby-fs" square=${true} />
         </div>
       </div>
       <div class="topbar__center">

@@ -14,14 +14,14 @@
 // Only font-size declarations read `--t`, so the board, the HUD bands the prep camera keeps clear and the detail
 // card's side do not move — the field is sized from the host element's clientWidth (render/app.js).
 
-import { useLayoutEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useLayoutEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { html, Modal, Button, Icon, MicroLabel } from './components.js';
 import { GIcon } from './gameComponents.js';
 import { createStore, useStore, loadPref, savePref, store } from '../store.js';
 import { sanitizeSettings, HOTKEY_ACTIONS, DEFAULT_HOTKEYS, hotkeyLabel, rebindHotkey, isDefaultHotkeys, captureHotkey, VOICE_LANGS, TEXT_SIZES } from './gameLogic.js';
 import { audio } from '../audio.js';
 import { openGuide } from './guide.js';
-import { detectFeatures } from './device.js';
+import { detectFeatures, fullscreen } from './device.js';
 import { LangToggle, machineTranslationNote } from './lang.js';
 import { t, tc, N_ } from '../../../shared/i18n.js';
 import { errorCount, currentBattle, diagnosticsText } from '../diag.js';
@@ -85,6 +85,41 @@ function Toggle({ label, micro, value, onChange }) {
     <span class="set-row__label">${label}<${MicroLabel}>${micro}<//></span>
     <button type="button" class=${`set-toggle${value ? ' is-on' : ''}`} role="switch" aria-checked=${value ? 'true' : 'false'}
       onClick=${() => onChange(!value)}><i></i><span>${value ? tc('toggle', '开启') : tc('toggle', '关闭')}</span></button>
+  </div>`;
+}
+
+/**
+ * 设置 →「全屏」: the same toggle as the title screen's ⛶ (ui/device.js), reachable from the lobby's and the room's top
+ * bar (SettingsButton) — on some phones the browser's own bars cover the whole bottom row of the title screen, the ⛶
+ * among it, and nothing there can be scrolled to (this fork). Where the browser has no element fullscreen the row
+ * explains the iOS way out instead (添加到主屏幕 starts the page without Safari's bars); elsewhere it is hidden, like
+ * FullscreenButton.
+ */
+function FullscreenRow() {
+  const [on, setOn] = useState(() => fullscreen.active());
+  const [ok] = useState(() => fullscreen.supported());
+  const [ios] = useState(() => { const f = detectFeatures(); return f.iosWebApp === true && f.standalone !== true; });
+  useEffect(() => {
+    const d = globalThis.document;
+    if (!d) return undefined;
+    const upd = () => setOn(fullscreen.active());
+    d.addEventListener('fullscreenchange', upd);
+    d.addEventListener('webkitfullscreenchange', upd);
+    return () => { d.removeEventListener('fullscreenchange', upd); d.removeEventListener('webkitfullscreenchange', upd); };
+  }, []);
+  if (!ok) {
+    // iPhone Safari: no element fullscreen, and only iOS browsers can put the page on the home screen (a page already
+    // started from there needs nothing, and a browser that can do neither gets no row at all).
+    if (!ios) return null;
+    return html`<div class="set-row">
+      <span class="set-row__label">${t('全屏')}<${MicroLabel}>FULLSCREEN<//></span>
+      <span class="set-hint" data-testid="fullscreen-ios-hint">${t('添加到桌面以进行全屏游玩（分享 → 添加到主屏幕）')}</span>
+    </div>`;
+  }
+  return html`<div class="set-row">
+    <span class="set-row__label">${t('全屏')}<${MicroLabel}>FULLSCREEN<//></span>
+    <button type="button" class=${`set-toggle${on ? ' is-on' : ''}`} role="switch" aria-checked=${on ? 'true' : 'false'}
+      data-testid="fullscreen" onClick=${() => fullscreen.toggle()}><i></i><span>${on ? tc('toggle', '开启') : tc('toggle', '关闭')}</span></button>
   </div>`;
 }
 
@@ -270,6 +305,7 @@ export function SettingsModal({ open, onClose }) {
             class=${s.quality === id ? 'is-on' : ''} onClick=${() => updateSettings({ quality: id })}>${t(label)}</button>`)}
         </div>
       </div>
+      <${FullscreenRow} />
       <div class="set-row">
         <span class="set-row__label">${t('文字大小')}<${MicroLabel}>TEXT SIZE<//></span>
         <div class="set-seg set-textsize" role="radiogroup" aria-label=${t('文字大小')} data-testid="text-size">

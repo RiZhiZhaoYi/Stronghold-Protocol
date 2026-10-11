@@ -70,6 +70,11 @@ export function detectFeatures(win = globalThis) {
     hover,
     fullscreen: fsEnabled,
     standalone: mq(win, '(display-mode: standalone)') || mq(win, '(display-mode: fullscreen)') || nav.standalone === true,
+    // iOS browsers (Safari, Chrome, Firefox — all WebKit) define navigator.standalone; desktop Safari, Android and the
+    // desktop install prompts do not. There is no element fullscreen on an iPhone, and 添加到主屏幕 (which iOS alone
+    // offers without beforeinstallprompt) is the only way to a page without Safari's bars — the settings' 全屏 row
+    // explains that instead of hiding (this fork, ui/settings.js).
+    iosWebApp: nav.standalone !== undefined,
     reducedMotion: mq(win, '(prefers-reduced-motion: reduce)'),
     screenLandscape: screenLandscape(win),
     importMaps,
@@ -143,8 +148,13 @@ export const fullscreen = {
   toggle(win = globalThis) { return this.active(win) ? this.exit(win) : this.enter(win); },
 };
 
-/** Fullscreen toggle (hidden where the browser has no element fullscreen, e.g. iPhone Safari). */
-export function FullscreenButton({ class: cls = '' }) {
+/**
+ * Fullscreen toggle (hidden where the browser has no element fullscreen, e.g. iPhone Safari).
+ * `square`: the top-bar variant — a plain square Icon Button that takes the size and spacing of the ⚙ / 📖 squares it
+ * stands next to (the lobby's and the room's top bars, this fork); without it the title screen's own framed ⛶ stays.
+ * @param {{ class?: string, square?: boolean, size?: 'sm'|'md'|'lg'|'xl', variant?: string }} props
+ */
+export function FullscreenButton({ class: cls = '', square = false, size = 'sm', variant = 'secondary' }) {
   const [on, setOn] = useState(() => fullscreen.active());
   const [ok] = useState(() => fullscreen.supported());
   useEffect(() => {
@@ -157,6 +167,10 @@ export function FullscreenButton({ class: cls = '' }) {
   }, []);
   if (!ok) return null;
   const label = on ? t('退出全屏') : t('全屏');
+  if (square) {
+    return html`<${Button} variant=${variant} size=${size} square=${true} active=${on} class=${cls} icon=${on ? 'collapse' : 'expand'}
+      title=${label} aria-label=${label} onClick=${() => fullscreen.toggle()} />`;
+  }
   return html`<button type="button" class=${`fsbtn tapx ${cls}`} aria-label=${label} title=${label} aria-pressed=${on ? 'true' : 'false'}
       onClick=${() => fullscreen.toggle()}>
     <${Icon} name=${on ? 'collapse' : 'expand'} />
