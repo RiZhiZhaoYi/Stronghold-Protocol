@@ -172,3 +172,96 @@ test('the official battle effects manifest (/data/local-fx.json, DESIGN §33) is
   assert.ok(got.includes('/assets/~fedcba0987654321/local/fx/prefabs/common_hit_01.json'));
   assert.ok(got.includes('/assets/~1234567890abcdef/a.png'));
 });
+
+test('prepare(): the manifests and their group sizes are read without requesting one art file', async () => {
+  const got = [];
+  const queue = createAssetDownload({ lookupImported: async () => new Set(), fetch: fixture(
+    { sizes: { core: { files: 1, bytes: 100 }, 'voice:jp': { files: 1, bytes: 200 } },
+      a: '/assets/a.png', voice: { char_a: { start: '/assets/audio/voice/jp/char_a/1.mp3' } } },
+    async (url) => { got.push(url); return file(); }) });
+  await queue.prepare();
+  assert.deepEqual(got, [], 'no art file is requested while the dialog shows what a selection costs');
+  const ready = queue.get();
+  assert.equal(ready.phase, 'ready');
+  assert.equal(ready.prepared, true);
+  assert.deepEqual(ready.available, [{ group: 'core', files: 1, bytes: 100 }, { group: 'voice:jp', files: 1, bytes: 200 }]);
+  assert.deepEqual(queue.plan(['core']), { files: 1, bytes: 100, known: true });
+  assert.deepEqual(queue.plan(['core', 'fx']), { files: 1, bytes: 100, known: false }, 'a group without a served size makes the estimate unknown');
+  assert.equal(ready.selection, null, 'nothing chosen yet: every group');
+  queue.select(['voice:jp']);
+  assert.deepEqual(queue.get().selection, ['voice:jp']);
+  assert.deepEqual(queue.get().planned, { files: 1, bytes: 200, known: true });
+  await queue.start();
+  assert.deepEqual(got, ['/media/voice/jp/char_a/1'], 'only the chosen group is requested');
+  assert.equal(queue.get().phase, 'complete');
+  assert.deepEqual(queue.get().byGroup, { 'voice:jp': { files: 1, done: 1 } });
+});
+
+test('a server without a sizes map still works: file counts, no byte estimate', async () => {
+  const queue = createAssetDownload({ fetch: fixture({ a: '/assets/a.png' }, async () => file()) });
+  await queue.prepare();
+  assert.deepEqual(queue.get().available, [{ group: 'core', files: 1, bytes: 0 }]);
+  assert.deepEqual(queue.plan(['core']), { files: 1, bytes: 0, known: false });
+  queue.select(['core']);
+  assert.deepEqual(queue.get().planned, { files: 1, bytes: 0, known: false });
+  await queue.start();
+  assert.equal(queue.get().phase, 'complete');
+  assert.equal(queue.get().done, 1);
+});
+
+test('a new selection forgets the finished run and downloads its own groups', async () => {
+  const calls = [];
+  const queue = createAssetDownload({ fetch: fixture(
+    { sizes: { core: { files: 1, bytes: 5 }, 'voice:jp': { files: 1, bytes: 5 } }, a: '/assets/a.png', v: '/assets/audio/voice/jp/char_a/1.mp3' },
+    async (url) => { calls.push(url); return file(); }) });
+  await queue.start({ groups: ['core'] });
+  assert.deepEqual(calls, ['/assets/a.png']);
+  assert.equal(queue.get().phase, 'complete');
+  assert.equal(queue.select(['core', 'voice:jp']), true);
+  assert.equal(queue.get().phase, 'ready', 'a new selection invalidates the completed run');
+  await queue.start();
+  assert.deepEqual(calls, ['/assets/a.png', '/assets/a.png', '/media/voice/jp/char_a/1']);
+  assert.equal(queue.get().phase, 'complete');
+  assert.deepEqual(queue.get().byGroup, { core: { files: 1, done: 1 }, 'voice:jp': { files: 1, done: 1 } });
+});
+
+test('a selection change is refused while a run is in flight', async () => {
+  let release; const held = new Promise((resolve) => { release = resolve; });
+  const queue = createAssetDownload({ concurrency: 1, fetch: fixture(
+    { sizes: { core: { files: 2, bytes: 10 } }, a: '/assets/a.png', b: '/assets/b.png' },
+    async () => { await held; return file(); }) });
+  const run = queue.start({ groups: ['core'] });
+  assert.equal(queue.select(['core', 'voice:jp']), false);
+  assert.deepEqual(queue.get().selection, ['core']);
+  release();
+  await run;
+  assert.equal(queue.get().phase, 'complete');
+  assert.equal(queue.get().done, 2);
+});
+
+test('a resume right after a pause waits for the aborted run instead of being dropped', async () => {
+  const calls = [];
+  let hold = true;
+  const queue = createAssetDownload({ concurrency: 1, fetch: fixture(
+    { sizes: { core: { files: 2, bytes: 10 } }, a: '/assets/a.png', b: '/assets/b.png' },
+    async (url, { signal }) => {
+      calls.push(url);
+      if (url === '/assets/a.png' || !hold) return file();
+      return new Response(new ReadableStream({ start(stream) {
+        stream.enqueue(new Uint8Array([1, 2]));
+        signal.addEventListener('abort', () => stream.error(new DOMException('Aborted', 'AbortError')), { once: true });
+      } }));
+    }) });
+  const first = queue.start({ groups: ['core'] });
+  await tick();
+  queue.pause();
+  hold = false;
+  const second = queue.start();
+  assert.notEqual(second, first, 'the resume is its own run, not the run that is still tearing down');
+  await second;
+  assert.equal(queue.get().phase, 'complete');
+  assert.equal(queue.get().done, 2);
+  assert.deepEqual(calls, ['/assets/a.png', '/assets/b.png', '/assets/b.png']);
+  await first;
+  assert.equal(queue.get().phase, 'complete', 'the aborted run does not put the queue back to paused');
+});

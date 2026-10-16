@@ -1,4 +1,18 @@
 {
+  "最小可玩": "Minimal",
+  "核心素材（干员、敌人、技能与音效）": "Core art (operators, enemies, skills and sound)",
+  "完整分辨率特效贴图": "Full-resolution effect textures",
+  "官方场景与关卡美术": "Official scenes and stage art",
+  "玩法说明图": "Gameplay guide art",
+  "约 {size} MB": "about {size} MB",
+  "本次将下载 {files} 个文件，约 {size} MB": "This will download {files} files, about {size} MB",
+  "本次将下载 {files} 个文件": "This will download {files} files",
+  "开始下载": "Start download",
+  "选择要下载的素材": "Choose what to download",
+  "{n} 个文件": "{n} files",
+  "{done} / {total}": "{done} / {total}",
+  "可选：不下载也能游玩，素材会按需加载；下载时建议使用 Wi-Fi。": "Optional: the game runs without it (art loads on demand); Wi-Fi recommended.",
+  "选择分组后点「开始下载」；已下载的文件不会重复下载，暂停时可以改选。": "Pick the groups, then \"Start download\"; files already downloaded are not fetched again, and you can change the choice while paused.",
   "_meta": {
     "type": "lang",
     "lang": "en",

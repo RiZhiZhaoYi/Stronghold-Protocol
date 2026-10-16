@@ -20,6 +20,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { hashedPath } from '../../shared/assetPaths.js';
 import { hash16 } from './assetIndex.js';
+import { groupOf } from '../../shared/assetGroups.js';
 import { noopLog } from './config.js';
 
 /** The manifests that have a view, by their name under data/. */
@@ -48,6 +49,37 @@ function spineUrls(o) {
   if (typeof o.atlas === 'string' && o.atlas) out.push(o.atlas);
   const pages = Array.isArray(o.textures) ? o.textures.filter((u) => typeof u === 'string' && u) : [];
   out.push(...(pages.length ? pages : [o.skel.replace(/\.skel$/, '.png')]));
+  return out;
+}
+
+/**
+ * The per-group byte totals of a committed manifest: every art URL (deduplicated, exactly as the client's download
+ * queue deduplicates them) classified by shared/assetGroups.js, sized by the index. A file the index does not know is
+ * still counted as a file (0 bytes), so the client's estimate is never short of a group it would request.
+ * @param {any} doc the committed manifest (not changed) @param {{ sizeOf?: (rel: string) => number | null }} index
+ * @returns {Record<string, { files: number, bytes: number }>}
+ */
+export function manifestSizes(doc, index) {
+  const sizeOf = typeof index?.sizeOf === 'function' ? index.sizeOf.bind(index) : () => null;
+  const out = {};
+  const seen = new Set();
+  const visit = (value) => {
+    if (typeof value === 'string') {
+      if (!ART_URL.test(value) || seen.has(value)) return;
+      seen.add(value);
+      const group = groupOf(value);
+      const entry = out[group] || (out[group] = { files: 0, bytes: 0 });
+      entry.files++;
+      const rel = relOf(value);
+      const size = rel ? sizeOf(rel) : null;
+      if (typeof size === 'number' && size > 0) entry.bytes += size;
+      return;
+    }
+    if (Array.isArray(value)) { for (const child of value) visit(child); return; }
+    if (!isObj(value)) return;
+    for (const child of Object.values(value)) visit(child);
+  };
+  visit(doc);
   return out;
 }
 
@@ -152,6 +184,9 @@ export function createManifestViews({ dataDir, index, log = noopLog }) {
     }
     // one synchronous step: the view and the model lists the index checks a model's URLs against
     const { doc: out, models, hashed, plain } = rewriteManifest(doc, name, index);
+    // The group byte totals the download dialog reads (shared/assetGroups.js); the committed manifest keeps none, and
+    // the view's own hash below changes with them, so a client never sees stale sizes.
+    out.sizes = manifestSizes(doc, index);
     const body = Buffer.from(JSON.stringify(out));
     const view = { body, hash: hash16(body), hashed, plain };
     cache.set(name, { key, view, models });

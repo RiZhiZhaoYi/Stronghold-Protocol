@@ -297,6 +297,15 @@ export function createAssetIndex({ publicDir, roots = ASSET_INDEX_ROOTS, cacheFi
       if (stat && (stat.size !== r.size || stat.mtimeMs !== r.mtimeMs)) return null;
       return r.hash;
     },
+    /**
+     * The size the last build recorded for `rel`, or null (assetViews.js: the served views' per-group byte totals —
+     * the download dialog says what a selection costs before the client has read a single file).
+     * @param {string} rel
+     */
+    sizeOf(rel) {
+      const r = recordOf(rel);
+      return r ? r.size : null;
+    },
     /** Does `urlHash` name exactly these bytes: the file's own hash, or the hash of a model it belongs to? */
     urlHashOk(rel, stat, urlHash) {
       if (typeof urlHash !== 'string') return false;

@@ -54,11 +54,19 @@ test('homepage download, visible failure/retry, pause, cache reuse, and the two 
     await page.screenshot({ path: path.join(process.env.SP_ASSET_SCREENSHOTS, 'title.png') });
   }
   await page.click('[data-testid="asset-download"]');
+  // Opening the dialog reads the manifests and shows what the selection costs; art starts with 开始下载 only.
+  const ready = () => page.waitForFunction(() => {
+    const button = document.querySelector('[data-testid="asset-download-start"]');
+    return button && !button.disabled;
+  });
+  await ready();
+  assert.equal(counts.size, 0, 'opening the download dialog requests no art');
+  await page.click('[data-testid="asset-download-start"]');
   await page.waitForFunction(() => document.querySelector('[data-testid="asset-download-status"]')?.textContent.includes('1 个素材下载失败'));
   assert.equal(await page.$eval('.asset-download [role="progressbar"]', (el) => el.getAttribute('aria-valuenow')), '1');
   assert.equal(counts.get(image), 1);
   fixed = true;
-  await page.click('[data-testid="asset-download-resume"]');
+  await page.click('[data-testid="asset-download-start"]');
   await page.waitForFunction(() => document.querySelector('[data-testid="asset-download-status"]')?.textContent.includes('本次素材下载完成'));
   assert.equal(counts.get(image), 1, 'retry does not transfer a successful file again');
   assert.equal(await page.evaluate((url) => new Promise((resolve) => {
@@ -104,11 +112,17 @@ test('homepage download, visible failure/retry, pause, cache reuse, and the two 
   hanging = true;
   await other.goto(srv.url);
   await other.click('[data-testid="asset-download"]');
+  await other.waitForFunction(() => {
+    const button = document.querySelector('[data-testid="asset-download-start"]');
+    return button && !button.disabled;
+  });
+  await other.click('[data-testid="asset-download-start"]');
   await other.waitForFunction(async () => (await import('/js/assetDownload.js')).assetDownload.get().phase === 'downloading');
   await other.keyboard.press('Escape');
   await other.waitForFunction(async () => (await import('/js/assetDownload.js')).assetDownload.get().phase === 'paused');
   hanging = false;
   await other.click('[data-testid="asset-download"]');
+  await other.click('[data-testid="asset-download-start"]');
   await other.waitForFunction(() => document.querySelector('[data-testid="asset-download-status"]')?.textContent.includes('本次素材下载完成'));
   assert.deepEqual(errors, []);
 });

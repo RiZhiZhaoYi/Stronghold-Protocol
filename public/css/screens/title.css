@@ -245,6 +245,18 @@
 .asset-download, .asset-import-dialog { text-align: left; }
 .asset-download p, .asset-import-dialog p { margin: .12rem 0; line-height: 1.6; }
 .asset-import-dialog .asset-import__status:empty { margin: 0; }
+.asset-download__presets { margin: .08rem 0 .14rem; }
+.asset-download__presets button { display: flex; flex-direction: column; gap: .02rem; min-width: .7rem; padding: .04rem .08rem; }
+.asset-download__presets button small { color: inherit; font-size: calc(.12 * var(--t)); opacity: .8; font-weight: 400; }
+.asset-download__groups { display: grid; gap: .05rem; margin: .1rem 0; }
+.asset-download__group { display: flex; align-items: center; gap: .1rem; }
+.asset-download__group label { flex: 1 1 auto; display: flex; align-items: center; gap: .06rem; min-width: 0; }
+.asset-download__group input { flex: none; width: max(.16rem, 14px); height: max(.16rem, 14px); accent-color: var(--mint-500); }
+.asset-download__group em { flex: none; color: var(--text-lo); font-style: normal; font-size: calc(.13 * var(--t)); }
+.asset-download__group input:disabled + span { color: var(--text-lo); }
+.asset-download__progress { margin: .08rem 0; padding-left: .24rem; max-height: 1.6rem; overflow: auto; }
+.asset-download__progress li { display: flex; justify-content: space-between; gap: .1rem; color: var(--text-lo); font-size: calc(.13 * var(--t)); }
+.asset-download__progress em { font-style: normal; }
 .asset-download__errors { color: var(--amber); }
 .asset-download__errors ul { max-height: 1.8rem; overflow: auto; padding-left: .24rem; }
 .asset-download__errors code { overflow-wrap: anywhere; font-size: calc(.13 * var(--t)); }

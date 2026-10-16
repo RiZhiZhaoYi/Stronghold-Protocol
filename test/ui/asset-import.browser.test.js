@@ -171,6 +171,11 @@ test('import has its own dialog that requests nothing on opening; imported art i
   assert.ok(probes > beforeProbe, 'a non-asset URL still reaches the server');
 
   await page.click('[data-testid="asset-download"]');
+  await page.waitForFunction(() => {
+    const button = document.querySelector('[data-testid="asset-download-start"]');
+    return button && !button.disabled;
+  });
+  await page.click('[data-testid="asset-download-start"]');
   await page.waitForFunction(() => document.querySelector('[data-testid="asset-download-status"]')?.textContent.includes('1 个素材下载失败'));
   assert.equal(counts.get(zipUrl) || 0, 0, 'download skips the imported zip file');
   assert.equal(counts.get(folderUrl) || 0, 0, 'download skips the imported folder file');
