@@ -89,7 +89,8 @@ export function AssetDownloadButton() {
   const planLine = planned.known
     ? t('本次将下载 {files} 个文件，约 {size} MB', { files: planned.files, size: mb(planned.bytes) })
     : t('本次将下载 {files} 个文件', { files: planned.files });
-  const ready = state.cached || 0;
+  // done includes both imported files and fully read downloads; cached counts imports only.
+  const ready = state.done || 0;
   const missing = Math.max(0, (state.total || 0) - ready);
   const action = state.phase === 'complete' ? t('重新检查')
     : state.phase === 'paused' ? t('继续下载素材')

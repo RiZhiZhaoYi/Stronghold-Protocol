@@ -287,7 +287,7 @@ describe('「恭喜发财」: the lobby switch', () => {
     const a = await player('A');
     await ok(a, { t: 'room.create', mode: 'coop', difficulty: 'NORMAL' });
     const off = await a.waitFor('room.state', (s) => s.hostId === a.id);
-    assert.equal(off.lucky, false, 'off unless asked for');
+    assert.equal(off.lucky, undefined, 'off unless asked for: the key is left out, so a default room.state stays the message it was');
 
     const b = await player('B');
     await ok(b, { t: 'room.create', mode: 'coop', difficulty: 'HARD', lucky: true });
