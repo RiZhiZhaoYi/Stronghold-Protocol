@@ -1,4 +1,3 @@
-import { avatarUrl } from '../assets.js';
 // Room screen (同盟等待室), laid out like the event's room: 4 tall seat cards (the 名片干员 portrait or the avatar frame,
 // 创建者, the ready state at the bottom, the name plate under the card; an empty seat offers 邀请 — copies the key — and,
 // to the host, 添加 AI 队友; the host's 移出 / 移除 AI 队友 at a card's top right), the top bar (leave, mode and ping, 统计 /
@@ -253,13 +252,16 @@ function CardPicker({ current, list, m, localSkins = {}, onPick, onClose }) {
  * host of a co-op room, 添加 AI 队友. `portrait` is the outfit's picture, `portraitDefault` the operator's default one
  * (given when an outfit is worn): a picture that fails to load gives way to the next, the last to the avatar frame.
  */
+// The elite AIs' own portraits: the E2 art of their operator, resolved through ui/assetUrls.js — the room screen
+// already imports it, and it keeps assets.js out of main.js's import graph (test/ui/plugins-client.test.js: a vanilla
+// page loads none of the asset store).
 function ArturiaAvatar(props) {
   useData("assets");
-  return html`<${AvatarFrame} ...${props} src=${avatarUrl(data.get("assets"), "char_245_cello", { e2: true })} />`;
+  return html`<${AvatarFrame} ...${props} src=${chessAvatarUrl(data.get("assets"), { assets: { avatar: "char_245_cello_2" } })} />`;
 }
 function LaviniaAvatar(props) {
   useData("assets");
-  return html`<${AvatarFrame} ...${props} src=${avatarUrl(data.get("assets"), "char_4065_judge", { e2: true })} />`;
+  return html`<${AvatarFrame} ...${props} src=${chessAvatarUrl(data.get("assets"), { assets: { avatar: "char_4065_judge_2" } })} />`;
 }
 const ELITE_RECRUITS = Object.freeze([{ id: "arturia", label: () => t("阿尔图罗") }, { id: "lavinia", label: () => t("拉维妮娅") }]);
 function EliteRecruit({ room, busy, onAdd }) {

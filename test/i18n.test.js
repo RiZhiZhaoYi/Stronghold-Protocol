@@ -136,8 +136,13 @@ test('the whole client, shared and the server messages: no Chinese literal left 
   // what tools/i18n.mjs scans: public/js (not dev / vendor / assets / fonts), public/studio, shared, server — server/sim only for the
   // texts it sends (msg() / ctx.toast), its own t() / N_() are other helpers
   const SKIP = new Set(['node_modules', 'vendor', 'assets', 'fonts', 'dev']);
+  // The fork's bundled third-party AIs (AI·阿尔图罗, AI·拉维妮娅) are vendored code under server/match/<addon>/:
+  // their Chinese strings are data keys matched against the game data (faction and class names a bot heuristic
+  // looks for), not interface text, so the wrapping/msgid rule does not apply to them.
+  const VENDORED = ['server/match/arturia', 'server/match/lavinia'];
   const files = [];
   const visit = (rel) => {
+    if (VENDORED.some((v) => rel === v)) return;
     for (const name of readdirSync(path.join(ROOT, rel)).sort()) {
       if (SKIP.has(name) || name.startsWith('.')) continue;
       const r = `${rel}/${name}`;

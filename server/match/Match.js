@@ -291,7 +291,8 @@ export class Match {
     this.modeId = opts.modeId || modeIdFor(this.mode, opts.difficulty);
     /**
      * 「恭喜发财」 (LUCKY_MODE): the room's optional mode flag, stacked on the difficulty. Every player draws one
-     * distinct random tier-5 operator at the strategy draft; m.public players[].lucky carries the draw.
+     * distinct random tier-5 operator as the strategy draft opens — never during 确认本局信息, which can be rerolled
+     * (setupVote.js); m.public players[].lucky carries the draw.
      */
     this.lucky = !!opts.lucky;
     this.seed = (Number(opts.seed) >>> 0) || 1;

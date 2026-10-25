@@ -2,10 +2,14 @@
 // 「恭喜发财」，每个人在进入游戏时都能获取一个随机五阶干员，但是都不重复，并且缪尔赛斯不能作为随机干员，并且在选择策略时就
 // 在每个人旁边显示自己的开局随机五阶干员").
 //
-//   * Engine: every seat of a lucky match draws ONE tier-5 operator at the strategy draft (Match.grantLuckyChess); the
-//     draws are pairwise distinct, 缪尔赛思 can never be drawn, the piece is a normal gained piece (the 整备区, one
-//     shared-pool copy) and m.public carries it as players[].lucky / luckyName throughout the draft. A match without the
-//     flag is byte-for-byte unaffected.
+//   * Engine: every seat of a lucky match draws ONE tier-5 operator as the strategy draft opens (Match.grantLuckyChess,
+//     called from enterBandDraft); the draws are pairwise distinct, 缪尔赛思 can never be drawn, the piece is a normal
+//     gained piece (the 整备区, one shared-pool copy) and m.public carries it as players[].lucky / luckyName throughout
+//     the draft. NOT at 确认本局信息: that briefing can be rerolled (match/setupVote.js rebuilds the pool, the stage and
+//     the bans), and a copy drawn from the discarded pool would be a phantom in the 整备区. A match without the flag is
+//     byte-for-byte unaffected.
+//   * Official versions (versions M1): the draw reads the match's own data (its pool, its tiers), so a 第一期 / 上半
+//     room draws that version's tier-5 operators; covered below with the real version data.
 //   * Lobby: room.create { lucky } sets it, room.setLucky is host-only, LOBBY-only, un-readies the other humans, and
 //     room.state carries it. Match receives opts.lucky.
 
@@ -17,6 +21,8 @@ import { startServer } from '../server/index.js';
 import { StubMatch } from '../server/match/StubMatch.js';
 import { TestClient } from './helpers/wsClient.js';
 import { makeMatch, DATA } from './match/harness.js';
+import { getVersionData } from '../server/data.js';
+import { VERSIONS } from '../shared/versions.js';
 
 const MLYSS = 'chess_char_6_11_a'; // 缪尔赛思 (tier 6 — never a candidate, and on the exclusion list)
 /** Visible base operator ids of the draw tier, before this match's pool bans. */
@@ -31,14 +37,14 @@ const candidatesOf = (m) => [...m.pool.entries]
   .map(([id]) => id)
   .sort();
 
-/** Reach INFO_CHECK of a lucky (or plain) match: the phase the draw is published in (owner's decision 2026-10-06). */
+/** Reach INFO_CHECK of a lucky (or plain) match: the briefing, where a lucky match has NOT drawn yet (it can still be rerolled). */
 function briefingOf(o = {}) {
   const h = makeMatch({ mode: 'coop', humans: 3, bots: 1, seed: 42, ...o }).start();
   assert.equal(h.m.phase, PHASE.INFO_CHECK);
   return h;
 }
 
-/** Reach BAND_DRAFT of a lucky (or plain) match (every human confirms the briefing). */
+/** Reach BAND_DRAFT of a lucky (or plain) match (every human confirms the briefing): the draw is made here. */
 function draftOf(o = {}) {
   const h = briefingOf(o);
   for (const ps of h.m.players.values()) if (!ps.isBot) h.m.handle(ps.playerId, { t: 'g.infoReady' });
@@ -95,35 +101,103 @@ describe('「恭喜发财」: the opening draw (engine)', () => {
     h.m.dispose();
   });
 
-  test('the draw is already published in 确认本局信息 (owner\'s decision 2026-10-06: earlier than the draft)', () => {
+  test('确认本局信息 shows no draw: that briefing can still be rerolled (match/setupVote.js)', () => {
     const h = briefingOf({ seed: 3, lucky: true });
     const pub = h.m.publicView();
     assert.equal(pub.phase, PHASE.INFO_CHECK);
     assert.equal(pub.lucky, true, 'the mode flag is on from the briefing on');
+    for (const p of pub.players) {
+      assert.equal(Object.hasOwn(p, 'lucky'), false, 'nothing drawn while the briefing is open');
+      assert.equal(Object.hasOwn(p, 'luckyName'), false);
+      const ps = h.m.players.get(p.playerId);
+      assert.equal(ps.luckyChess, null);
+      assert.equal(ps.hand.filter(Boolean).length, 0, 'no piece in the 整备区 before the draft');
+    }
+    h.invariants();
+    h.m.dispose();
+  });
+
+  test('the draw is published as the strategy draft opens (owner\'s decision: readable while picking)', () => {
+    const h = draftOf({ seed: 3, lucky: true });
+    const pub = h.m.publicView();
+    assert.equal(pub.phase, PHASE.BAND_DRAFT);
+    assert.equal(pub.lucky, true);
     const okay = new Set(candidatesOf(h.m));
     const drawn = [];
     for (const p of pub.players) {
-      assert.ok(p.lucky, `${p.playerId} has no draw at the briefing`);
+      assert.ok(p.lucky, `${p.playerId} has no draw at the draft`);
       assert.equal(p.luckyName, DATA.chess[p.lucky].name);
       assert.ok(okay.has(p.lucky));
       drawn.push(p.lucky);
-      // the piece is in the 整备区 from the briefing on, and the board is still empty
+      // the piece is in the 整备区, and the board is still empty
       const ps = h.m.players.get(p.playerId);
       assert.deepEqual(ps.hand.filter(Boolean).map((x) => x.id), [ps.luckyChess]);
       assert.equal(ps.board.size, 0);
     }
     assert.equal(new Set(drawn).size, drawn.length, 'still all different');
-    // and it stays put across the phase change into the draft
-    for (const ps of h.m.players.values()) if (!ps.isBot) h.m.handle(ps.playerId, { t: 'g.infoReady' });
-    h.sched.advance(1);
-    assert.equal(h.m.phase, PHASE.BAND_DRAFT);
-    assert.deepEqual(h.m.publicView().players.map((p) => p.lucky), drawn);
     h.invariants();
     h.m.dispose();
   });
 
-  test('the draw happens once: entering INFO_CHECK again (a new draw) never repeats for a seat that has one', () => {
-    const h = briefingOf({ seed: 6, lucky: true });
+  test('a solo setup reroll: the draw follows the FINAL pool, never a copy of the discarded one', () => {
+    // The live bug (6007, 2026-10-25): solo lucky drew at the briefing, the player then rerolled the setup (solo completes
+    // the vote at once), the old hand copy stayed while the new pool never held it — `left + held == cap` broke.
+    const h = makeMatch({ mode: 'solo', difficulty: 'HARD', seed: 3, lucky: true, fake: true }).start();
+    assert.equal(h.m.phase, PHASE.INFO_CHECK);
+    assert.equal(h.m.setupRevision, 0);
+    const firstPool = candidatesOf(h.m).join(',');
+    assert.equal(h.m.requestSetupReroll('p_0', h.m.setupRevision).ok, true, 'solo: the reroll completes at once');
+    assert.equal(h.m.setupRevision, 1);
+    assert.equal(h.m.phase, PHASE.INFO_CHECK, 'the rerolled opening is still 确认本局信息');
+    // nothing was drawn before the reroll, and the rerolled briefing shows nothing either
+    for (const ps of h.m.players.values()) {
+      assert.equal(ps.luckyChess, null);
+      assert.equal(ps.hand.filter(Boolean).length, 0);
+    }
+    const pub = h.m.publicView();
+    assert.equal(pub.players.some((p) => Object.hasOwn(p, 'lucky')), false);
+    h.invariants();
+    // confirm the new briefing (g.infoReady names the current setup revision): the draw comes from the rerolled pool
+    assert.equal(h.m.handle('p_0', { t: 'g.infoReady', setupRevision: h.m.setupRevision }).ok, true);
+    h.sched.advance(1);
+    assert.equal(h.m.phase, PHASE.BAND_DRAFT);
+    const ps = h.ps('p_0');
+    assert.equal(typeof ps.luckyChess, 'string', `nothing drawn after the reroll (old pool ${firstPool})`);
+    assert.ok(candidatesOf(h.m).includes(ps.luckyChess), `${ps.luckyChess} must be in the REROLLED pool`);
+    assert.equal(ps.hand.filter(Boolean).length, 1);
+    assert.equal(ps.hand.filter(Boolean)[0].poolCopies, 1, 'a real copy of the rerolled pool');
+    h.invariants();
+    h.m.dispose();
+  });
+
+  test('a co-op setup reroll vote: no draw while the vote runs, and the draw never comes from the discarded pool', () => {
+    const h = briefingOf({ seed: 9, lucky: true }); // 3 humans + 1 bot
+    assert.equal(h.m.setupRevision, 0);
+    const humans = h.m.humans().map((p) => p.playerId);
+    assert.equal(h.m.requestSetupReroll(humans[0], h.m.setupRevision).ok, true);
+    assert.ok(h.m.setupVote, 'a vote is open');
+    for (const pid of humans.slice(1)) assert.equal(h.m.voteSetupReroll(h.m.players.get(pid), h.m.setupVote.id, true).ok, true);
+    assert.equal(h.m.setupRevision, 1, 'the last agreement completes the reroll');
+    assert.equal(h.m.phase, PHASE.INFO_CHECK);
+    for (const ps of h.m.players.values()) assert.equal(ps.luckyChess, null);
+    h.invariants();
+    for (const ps of h.m.players.values()) if (!ps.isBot) h.m.handle(ps.playerId, { t: 'g.infoReady', setupRevision: h.m.setupRevision });
+    h.sched.advance(1);
+    assert.equal(h.m.phase, PHASE.BAND_DRAFT);
+    const okay = new Set(candidatesOf(h.m));
+    const drawn = [];
+    for (const ps of h.m.players.values()) {
+      assert.ok(okay.has(ps.luckyChess), `${ps.playerId}: ${ps.luckyChess} must be in the rerolled pool`);
+      assert.equal(ps.hand.filter(Boolean).length, 1);
+      drawn.push(ps.luckyChess);
+    }
+    assert.equal(new Set(drawn).size, drawn.length, 'still all different after a reroll');
+    h.invariants();
+    h.m.dispose();
+  });
+
+  test('grantLuckyChess is idempotent: a seat that already drew never draws again', () => {
+    const h = draftOf({ seed: 6, lucky: true });
     const before = [...h.m.players.values()].map((ps) => ps.luckyChess);
     assert.ok(before.every(Boolean));
     // re-running the grant is a no-op for every seat that already has one (it is guarded by ps.luckyChess)
@@ -168,7 +242,7 @@ describe('「恭喜发财」: the opening draw (engine)', () => {
     h.m.dispose();
   });
 
-  test('the draw happens exactly once, at the briefing — not again at round start', () => {
+  test('the draw happens exactly once, at the draft — not again at round start', () => {
     const h = draftOf({ seed: 11, lucky: true }).autoHumans();
     const before = [...h.m.players.values()].map((ps) => ps.luckyChess);
     h.run(() => h.m.round >= 1);
@@ -256,6 +330,42 @@ describe('「恭喜发财」: the opening draw (engine)', () => {
 });
 
 // ---------------------------------------------------------------------------------------------------
+// official versions (versions M1): the draw reads the match's own data, never the default one
+// ---------------------------------------------------------------------------------------------------
+
+describe('「恭喜发财」: official versions', () => {
+  test('every official version draws that version\'s own tier-5 operators', () => {
+    const quiet = { warn() {}, error() {}, info() {} };
+    for (const v of VERSIONS) {
+      const data = v.dir === '' ? DATA : getVersionData(v.id, { log: quiet });
+      const tier5 = Object.values(data.chess)
+        .filter((c) => c.visible && !c.isGolden && !c.isDiy && !c.isHidden && c.tier === LUCKY_MODE.tier);
+      assert.ok(tier5.length >= 4, `${v.id}: expected several tier-5 operators, got ${tier5.length}`);
+      // the excluded operator is the same record in every shipped version (same id, still tier 6)
+      assert.equal(data.chess[MLYSS].tier, LUCKY_MODE.tier + 1, `${v.id}: ${MLYSS} stays out of the draw tier`);
+      const h = makeMatch({ mode: 'coop', difficulty: 'HARD', humans: 2, bots: 1, seed: 7, data, lucky: true, fake: true }).start();
+      for (const ps of h.m.players.values()) if (!ps.isBot) h.m.handle(ps.playerId, { t: 'g.infoReady' });
+      h.sched.advance(1);
+      assert.equal(h.m.phase, PHASE.BAND_DRAFT, v.id);
+      const drawn = [];
+      for (const ps of h.m.players.values()) {
+        assert.equal(typeof ps.luckyChess, 'string', `${v.id}: ${ps.playerId} drew nothing`);
+        assert.equal(data.chess[ps.luckyChess].tier, LUCKY_MODE.tier, `${v.id}: ${ps.luckyChess} is tier 5`);
+        assert.notEqual(ps.luckyChess, MLYSS);
+        assert.equal(ps.hand.filter(Boolean).length, 1);
+        assert.equal(ps.hand.filter(Boolean)[0].poolCopies, 1, `${v.id}: a real copy of this version's pool`);
+        assert.equal(h.m.pool.left(ps.luckyChess), h.m.pool.cap(ps.luckyChess) - 1);
+        drawn.push(ps.luckyChess);
+      }
+      assert.equal(new Set(drawn).size, drawn.length, `${v.id}: all different (${drawn.join(', ')})`);
+      assert.deepEqual(h.m.publicView().players.map((p) => p.lucky), drawn, `${v.id}: m.public names the draws`);
+      h.invariants();
+      h.m.dispose();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------
 // lobby wiring (room.create / room.setLucky / room.state / opts.lucky)
 // ---------------------------------------------------------------------------------------------------
 
@@ -333,7 +443,7 @@ describe('「恭喜发财」: the lobby switch', () => {
     await err(a, { t: 'room.setLucky', lucky: 1 }, ERR.BAD_MSG);
   });
 
-  test('「恭喜发财」 over the wire: the host turns it on and the draw shows up in the briefing (real match)', async () => {
+  test('「恭喜发财」 over the wire: the host turns it on and the draw shows up as the draft opens (real match)', async () => {
     // The stub match ends as soon as everyone confirms the briefing, so this one runs the real MatchClass.
     const real = await startServer({ port: 0, host: '127.0.0.1', log: quiet, seedFn: () => 4242 });
     try {
@@ -343,20 +453,20 @@ describe('「恭喜发财」: the lobby switch', () => {
       await ok(host, { t: 'room.create', mode: 'solo', difficulty: 'FUNNY', lucky: true });
       await host.waitFor('room.state', (s) => s.hostId === host.id && s.lucky === true);
       await ok(host, { t: 'room.start' });
-      // the draw is published while the briefing is up — before the player confirms anything (owner's decision 2026-10-06)
-      const pub = await host.waitFor('m.public', (p) => p.phase === PHASE.INFO_CHECK && p.lucky === true && p.players.some((x) => x.playerId === host.id && x.lucky), 5000);
-      assert.equal(pub.lucky, true);
+      // 确认本局信息 carries the flag but NOT the draw: this briefing can still be rerolled (match/setupVote.js)
+      const brief = await host.waitFor('m.public', (p) => p.phase === PHASE.INFO_CHECK && p.lucky === true, 5000);
+      assert.equal(brief.lucky, true);
+      assert.equal(brief.players.some((x) => Object.hasOwn(x, 'lucky')), false, 'nothing drawn at the briefing');
+      // the draw is made as the draft opens, before the player picks a strategy
+      await ok(host, { t: 'g.infoReady' }); // solo: the player confirms the briefing (no timer)
+      const pub = await host.waitFor('m.public', (p) => p.phase === PHASE.BAND_DRAFT && p.lucky === true && p.players.some((x) => x.playerId === host.id && x.lucky), 5000);
       const me = pub.players.find((p) => p.playerId === host.id);
       assert.equal(DATA.chess[me.lucky].tier, LUCKY_MODE.tier, `drew ${me.lucky}`);
       assert.notEqual(me.lucky, MLYSS);
       assert.equal(me.luckyName, DATA.chess[me.lucky].name);
-      // the piece is in the hand like any other gain
+      // the piece is in the hand like any other gain, from the first draft frame on
       const priv = await host.waitFor('m.private', (p) => (p.hand || []).some((x) => x && x.id === me.lucky), 3000);
       assert.ok(priv.hand.some((x) => x && x.id === me.lucky));
-      // … and it is still there after the briefing, in the strategy draft
-      await ok(host, { t: 'g.infoReady' }); // solo: the player confirms the briefing (no timer)
-      const draft = await host.waitFor('m.public', (p) => p.phase === PHASE.BAND_DRAFT && p.lucky === true, 5000);
-      assert.equal(draft.players.find((p) => p.playerId === host.id).lucky, me.lucky, 'the same operator in the draft');
       await host.terminate();
     } finally {
       await real.close();

@@ -138,7 +138,8 @@
     "policy/server/match/botForecast.js": "6c58765e28666bbccaa227be364823b4bff9a3dd6d3b1b419c1ec71256b40f7a",
     "policy/server/match/botStrategies/siracusaDraftSafety.js": "c8667bdbdaa3f4cd7e0ec1e71fc1560b30fd778959e1ce0ff1653d6aa56ecdd8",
     "policy/server/match/botDevelopment.js": "525016bdbbc682a9e77558f2459e7589a1d39ffe40dcfdd09a413efff51a3ac6",
-    "runtime.js": "d81237ab985cfead38b5f3ba4849b13c4287e594c75b47cc4ef0da41c0f6a140"
+    "runtime.js": "d81237ab985cfead38b5f3ba4849b13c4287e594c75b47cc4ef0da41c0f6a140",
+    "patches.mjs": "d3d44fae001d13ca7aab59fdf294e131fb0a581b914f83c82eab496699af360d"
   },
   "sourceRoot": "releases/lavinia-v0.1.2/source",
   "validation": {

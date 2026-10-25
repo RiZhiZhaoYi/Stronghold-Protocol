@@ -5,10 +5,13 @@ function replace(source, before, after, file) {
 }
 
 // Uses the room's existing controls and hooks; grows with the supported elite roster.
-const elitePicker = [
+const eliteAvatar = assetUrls => assetUrls
+  ? 'chessAvatarUrl(data.get("assets"), { assets: { avatar: "char_4065_judge_2" } })'
+  : 'avatarUrl(data.get("assets"), "char_4065_judge", { e2: true })';
+const elitePicker = avatarSrc => [
   'function LaviniaAvatar(props) {',
   '  useData("assets");',
-  '  return html`<${AvatarFrame} ...${props} src=${avatarUrl(data.get("assets"), "char_4065_judge", { e2: true })} />`;',
+  '  return html`<${AvatarFrame} ...${props} src=${' + avatarSrc + '} />`;',
   '}',
   'const ELITE_RECRUITS = Object.freeze([{ id: "lavinia", label: () => t("拉维妮娅") }]);',
   'function EliteRecruit({ room, busy, onAdd }) {',
@@ -56,7 +59,9 @@ function patchCleanFiles(files) {
   const room = 'public/js/screens/room.js';
   // Explicit compatibility branch for the retained 0.2.4 main (before content plugins existed).
   const legacy = !files.get(lobby).includes('room.content?.trusted');
-  out.set(room, "import { avatarUrl } from '../assets.js';\nimport { data, useData } from '../data.js';\n" + out.get(room));
+  const assetUrls = out.get(room).includes("from '../ui/assetUrls.js'");
+  out.set(room, (assetUrls ? '' : "import { avatarUrl } from '../assets.js';\n")
+    + (assetUrls ? '' : "import { data, useData } from '../data.js';\n") + out.get(room));
   edit('shared/protocol.js', "'room.addBot': {},", "'room.addBot': { persona: optional((v) => v === 'lavinia') },");
   edit(lobby, "case 'room.addBot': return this.addBot(session);", "case 'room.addBot': return this.addBot(session, msg);");
   edit(lobby, 'addBot(session) {', "addBot(session, { persona } = {}) {");
@@ -115,7 +120,7 @@ function patchCleanFiles(files) {
     if (isLavinia(this, this.players.get(playerId))) return BAND;`);
 
   edit(room, 'function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot, onKick }) {',
-    elitePicker + '\nfunction SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onAddElite, onRemoveBot, onKick }) {');
+    elitePicker(eliteAvatar(assetUrls)) + '\nfunction SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onAddElite, onRemoveBot, onKick }) {');
   edit(room, '? html`<${Button} variant="secondary" size="sm" icon="robot" block=${true} loading=${busy === `add`} onClick=${onAddBot}>${t(\'添加 AI 队友\')}<//>`',
     '? html`<div style="display:flex;flex-direction:column;gap:.08rem;width:100%"><${Button} variant="secondary" size="sm" icon="robot" block=${true} loading=${busy === `add`} onClick=${onAddBot}>${t(\'添加 AI 队友\')}<//>\n            <${EliteRecruit} room=${room} busy=${busy} onAdd=${onAddElite} /></div>`');
   edit(room, "  const addBot = () => run('add', () => net.request('room.addBot', {}));", "  const addBot = () => run('add', () => net.request('room.addBot', {}));\n  const addElite = persona => run('add', () => net.request('room.addBot', { persona }));");
@@ -191,9 +196,10 @@ export function patchFiles(files) {
   edit(phases, '  defaultBand(playerId) {', `  defaultBand(playerId) {
     if (isLavinia(this, this.players.get(playerId))) return LAVINIA_BAND;`);
   const picker = 'const ELITE_RECRUITS = Object.freeze([{ id: "arturia", label: () => t("阿尔图罗") }]);';
+  const avatarSrc = eliteAvatar(out.get(room).includes("from '../ui/assetUrls.js'"));
   edit(room, picker, `function LaviniaAvatar(props) {
   useData("assets");
-  return html\`<\$\{AvatarFrame\} ...\$\{props\} src=\$\{avatarUrl(data.get("assets"), "char_4065_judge", { e2: true })\} />\`;
+  return html\`<\$\{AvatarFrame\} ...\$\{props\} src=\$\{${avatarSrc}\} />\`;
 }
 const ELITE_RECRUITS = Object.freeze([{ id: "arturia", label: () => t("阿尔图罗") }, { id: "lavinia", label: () => t("拉维妮娅") }]);`.replaceAll('\\$', '$'));
   edit(room, "seat.isBot && seat.botPersona === 'arturia' ? ArturiaAvatar : AvatarFrame", "seat.isBot && seat.botPersona === 'lavinia' ? LaviniaAvatar : seat.isBot && seat.botPersona === 'arturia' ? ArturiaAvatar : AvatarFrame");

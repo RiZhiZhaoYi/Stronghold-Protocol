@@ -22,15 +22,10 @@ export class MatchPhases {
     this.markPublic();
     for (const ps of this.order) this.markPrivate(ps);
     this.flush(true);
-    // 「恭喜发财」 (LUCKY_MODE, owner's decision 2026-10-06): the opening draws are made as the briefing opens, so every
-    // player already reads the whole team's operators on 确认本局信息 — one step before the strategy draft and before
-    // anybody picks. After the flush above, so the draw is published by the frames that follow the briefing itself.
-    if (this.lucky) {
-      this.grantLuckyChess();
-      this.markPublic();
-      for (const ps of this.order) this.markPrivate(ps);
-      this.flush(true);
-    }
+    // 「恭喜发财」 (LUCKY_MODE): the draw is deliberately NOT made here. 确认本局信息 can be rerolled (setupVote.js
+    // rebuilds the pool, the stage and the bans and keeps the pieces), and an operator drawn from the discarded pool
+    // would outlive the copies it took from it — a phantom 整备区 entry that breaks `left + held == cap`
+    // (invariants.js). The draw waits for enterBandDraft, the first moment the opening can no longer change.
     this.maybeEndInfo();
   }
 
@@ -54,9 +49,10 @@ export class MatchPhases {
    *
    * The drawn operator is granted as a normal gained piece (PlayerState.acquireChess → the 整备区, taking a pool copy)
    * and remembered on the seat (`ps.luckyChess`), which m.public carries as `players[].lucky` / `luckyName` — the client
-   * shows it beside every player from 确认本局信息 on (owner's decision 2026-10-06: the briefing is where the draw first
-   * appears, one step earlier than the strategy draft). Not at ROUND_START: the operator, and the skill chosen for it in
-   * 干员调配, are meant to be readable before the strategies are picked.
+   * shows it beside every player from the first draft frame on (owner's decision 2026-10-05: it must be readable while
+   * the strategies are picked). Called from enterBandDraft, i.e. one step AFTER 确认本局信息, because that briefing can be
+   * rerolled (setupVote.js) and a draw taken from the discarded pool would be a phantom. Not at ROUND_START either: the
+   * operator, and the skill chosen for it in 干员调配, are meant to be readable before the strategies are picked.
    *
    * Randomness comes from rngSetup — the per-match "setup" stream the bans and the stage already used. Nothing else draws
    * from it after construction, so taking these numbers does not shift any other stream (rngShop/rngDraft/rngWaves/rngMeta).
@@ -124,6 +120,16 @@ export class MatchPhases {
     this.setDeadline(0);
     this.startDraftTurn();
     this.markPublic();
+    // 「恭喜发财」 (LUCKY_MODE, owner's decision 2026-10-06): the opening draws are made as the strategy draft opens —
+    // one step AFTER 确认本局信息, because a completed setup reroll rebuilds the pool/stage/bans while that briefing is
+    // still open (see the note in enterInfoCheck); the drawn copy therefore always belongs to the final pool. Still
+    // before anybody picks, so the 选择策略 order list reads players[].lucky from its first frame.
+    if (this.lucky) {
+      this.grantLuckyChess();
+      this.markPublic();
+      for (const ps of this.order) this.markPrivate(ps);
+      this.flush(true);
+    }
   }
 
   /**

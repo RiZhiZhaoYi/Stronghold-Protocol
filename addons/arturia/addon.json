@@ -265,7 +265,8 @@
     "policy/server/match/botFireControl.js": "b51947b95aec1d0386371670fef072f7df1d02f29ff44997ffe167159998d490",
     "policy/server/match/botStrategies/siracusaDraftSafety.js": "c8667bdbdaa3f4cd7e0ec1e71fc1560b30fd778959e1ce0ff1653d6aa56ecdd8",
     "policy/server/match/botDevelopment.js": "48a6c09910b6df134af3ed5bf7317421894004d49dbe8eb32bb7689f889c9eed",
-    "runtime.js": "bf806c159a166194ac51b704aaa7e1ba7434b4932a6105170a9fad22e13bee17"
+    "runtime.js": "bf806c159a166194ac51b704aaa7e1ba7434b4932a6105170a9fad22e13bee17",
+    "patches.mjs": "6bcabe61e1e74af39654329ff7acf43d47f30b8a4bc059db9724516abf3b8e83"
   },
   "sourceRoot": "releases/arturia-v0.2.4/source",
   "policySource": "Immutable verified source snapshot; per-file SHA-256, not a Git commit claim",

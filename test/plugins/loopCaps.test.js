@@ -373,7 +373,11 @@ test('three times an official interval still validates, and the shared bounds sn
 
 test('every while in the sim and the match names its loop cap', () => {
   const missing = [];
+  // The fork's bundled third-party AIs (AI·阿尔图罗, AI·拉维妮娅) are vendored code under server/match/<addon>/ and
+  // carry their own caps; the project's `// loop-cap:` convention is for first-party code only.
+  const VENDORED = new Set(['server/match/arturia', 'server/match/lavinia']);
   const walk = (dir) => {
+    if (VENDORED.has(dir.split(path.sep).join('/'))) return;
     for (const name of fs.readdirSync(dir)) {
       const abs = path.join(dir, name);
       if (fs.statSync(abs).isDirectory()) { walk(abs); continue; }

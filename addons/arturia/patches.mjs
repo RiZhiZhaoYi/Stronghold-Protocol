@@ -6,11 +6,19 @@ function replace(source, before, after, file) {
   return source.replace(before, after);
 }
 
-// Uses the room's existing controls and hooks; grows with the supported elite roster.
-const elitePicker = [
+// Uses the room's existing controls and hooks; grows with the supported elite roster.  The elite's portrait is her
+// operator's E2 art: 0.3.3's room.js resolves asset URLs through ui/assetUrls.js (which keeps assets.js out of
+// main.js's import graph), so prefer that there and fall back to assets.js on the older mains.
+const eliteAvatar = assetUrls => assetUrls
+  ? 'chessAvatarUrl(data.get("assets"), { assets: { avatar: "char_245_cello_2" } })'
+  : 'avatarUrl(data.get("assets"), "char_245_cello", { e2: true })';
+const elitePicker = avatarSrc => [
+  "// The elite AIs' own portraits: the E2 art of their operator, resolved through ui/assetUrls.js — the room screen",
+  "// already imports it, and it keeps assets.js out of main.js's import graph (test/ui/plugins-client.test.js: a vanilla",
+  '// page loads none of the asset store).',
   'function ArturiaAvatar(props) {',
   '  useData("assets");',
-  '  return html`<${AvatarFrame} ...${props} src=${avatarUrl(data.get("assets"), "char_245_cello", { e2: true })} />`;',
+  '  return html`<${AvatarFrame} ...${props} src=${' + avatarSrc + '} />`;',
   '}',
   'const ELITE_RECRUITS = Object.freeze([{ id: "arturia", label: () => t("阿尔图罗") }]);',
   'function EliteRecruit({ room, busy, onAdd }) {',
@@ -59,8 +67,9 @@ export function patchFiles(files, normalized = false) {
   const room = 'public/js/screens/room.js';
   // Explicit compatibility branch for the retained 0.2.4 main (before content plugins existed).
   const legacy = !files.get(lobby).includes('room.content?.trusted');
-  // 0.3.3 room.js already imports data/useData; a second binding would break the page.
-  out.set(room, "import { avatarUrl } from '../assets.js';\n"
+  // 0.3.3 room.js already imports data/useData and ui/assetUrls.js; a second binding would break the page.
+  const assetUrls = out.get(room).includes("from '../ui/assetUrls.js'");
+  out.set(room, (assetUrls ? '' : "import { avatarUrl } from '../assets.js';\n")
     + (out.get(room).includes("from '../data.js'") ? '' : "import { data, useData } from '../data.js';\n") + out.get(room));
   edit('shared/protocol.js', "'room.addBot': {},", "'room.addBot': { persona: optional((v) => v === 'arturia') },");
   edit(lobby, "case 'room.addBot': return this.addBot(session);", "case 'room.addBot': return this.addBot(session, msg);");
@@ -113,13 +122,13 @@ export function patchFiles(files, normalized = false) {
   if (out.get(room).includes('class="rseat__add"')) {
     // 0.3.3: the card grew portrait / operator / pick props, and the add-bot button wears rseat__add.
     edit(room, 'function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot, onKick, onInvite, portrait = null, portraitDefault = null, operator = null, onPickCard = null, fresh = false }) {',
-      elitePicker + '\nfunction SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onAddElite, onRemoveBot, onKick, onInvite, portrait = null, portraitDefault = null, operator = null, onPickCard = null, fresh = false }) {');
+      elitePicker(eliteAvatar(assetUrls)) + '\nfunction SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onAddElite, onRemoveBot, onKick, onInvite, portrait = null, portraitDefault = null, operator = null, onPickCard = null, fresh = false }) {');
     const addButton = '${canAdd ? html`<${Button} variant="secondary" size="sm" icon="robot" class="rseat__add" loading=${busy === \'add\'} onClick=${onAddBot}>${t(\'添加 AI 队友\')}<//>` : null}';
     edit(room, addButton,
       '${canAdd ? html`<div style="display:flex;flex-direction:column;gap:.08rem;width:100%"><${Button} variant="secondary" size="sm" icon="robot" block=${true} loading=${busy === \'add\'} onClick=${onAddBot}>${t(\'添加 AI 队友\')}<//>\n            <${EliteRecruit} room=${room} busy=${busy} onAdd=${onAddElite} /></div>` : null}');
   } else {
   edit(room, 'function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot, onKick }) {',
-    elitePicker + '\nfunction SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onAddElite, onRemoveBot, onKick }) {');
+    elitePicker(eliteAvatar(assetUrls)) + '\nfunction SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onAddElite, onRemoveBot, onKick }) {');
   edit(room, '? html`<${Button} variant="secondary" size="sm" icon="robot" block=${true} loading=${busy === `add`} onClick=${onAddBot}>${t(\'添加 AI 队友\')}<//>`',
     '? html`<div style="display:flex;flex-direction:column;gap:.08rem;width:100%"><${Button} variant="secondary" size="sm" icon="robot" block=${true} loading=${busy === `add`} onClick=${onAddBot}>${t(\'添加 AI 队友\')}<//>\n            <${EliteRecruit} room=${room} busy=${busy} onAdd=${onAddElite} /></div>`');
   }

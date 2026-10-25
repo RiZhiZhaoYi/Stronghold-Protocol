@@ -45,10 +45,13 @@ export const modeIdFor = (roomMode, difficulty) =>
 /**
  * 「恭喜发财」— an OPTIONAL match mode (room.lucky) that stacks on any difficulty and in both room types (owner's
  * request 2026-10-05: "新增一个模式，叫「恭喜发财」，每个人在进入游戏时都能获取一个随机五阶干员，但是都不重复").  When it is on, every
- * player of the match draws ONE random tier-5 operator as the briefing opens (Match.enterInfoCheck → grantLuckyChess)
- * — every draw is distinct, and the drawn operator is shown next to that player from 确认本局信息 on, through the
- * 选择策略 order list (m.public players[].lucky).  The operator is a normal gained piece: it costs a shared-pool copy,
- * sits in the 整备区 and can be deployed like any other operator.
+ * player of the match draws ONE random tier-5 operator as the strategy draft opens (Match.enterBandDraft →
+ * grantLuckyChess) — every draw is distinct, and the drawn operator is shown next to that player through the 选择策略
+ * order list (m.public players[].lucky).  NOT while 确认本局信息 is open: that briefing can be rerolled
+ * (server/match/match/setupVote.js rebuilds the pool, the stage and the bans), and a draw taken from the discarded pool
+ * would sit in the 整备区 without a pool copy.  The operator is a normal gained piece: it costs a shared-pool copy,
+ * sits in the 整备区 and can be deployed like any other operator.  The draw reads the match's own data (its pool and its
+ * tiers), so a room playing another official version (第一期上／下半、第二期上半) draws that version's operators.
  *
  * `excludedChessIds` is applied in the engine and deliberately never advertised: it is a rule of the request, not a
  * line of the mode's UI copy (owner's decision 2026-10-06, "把'不包含缪尔赛斯'删掉").  `tier` is not strictly necessary
