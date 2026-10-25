@@ -65,3 +65,7 @@ desktop.ini
 .claude/
 # tools/sim-check.mjs: the corpus and its Node traces for /dev/sim-check.html
 public/dev/simcheck/data/
+
+# --- addon install journals (addons/*/install.mjs; original bytes for uninstall) ---------------------
+.arturia-addon/
+.lavinia-addon/
