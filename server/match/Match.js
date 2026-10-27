@@ -1,3 +1,4 @@
+import { withAIAddons } from './aiAddons/index.js';
 // server/match/Match.js — the match & meta engine: state machine, timers, round loop, co-op orchestration,
 // broadcasting views (DESIGN §6, §8). Rules are documented in the module headers of ./PlayerState.js, ./pool.js,
 // ./board.js, ./bondsMeta.js, ./effectsMeta.js, ./choices.js, ./waves.js, ./unite.js, ./finalAssault.js,
@@ -291,7 +292,8 @@ export class Match {
     this.modeId = opts.modeId || modeIdFor(this.mode, opts.difficulty);
     /**
      * 「恭喜发财」 (LUCKY_MODE): the room's optional mode flag, stacked on the difficulty. Every player draws one
-     * distinct random tier-5 operator at the strategy draft; m.public players[].lucky carries the draw.
+     * distinct random tier-5 operator as the strategy draft opens — never during 确认本局信息, which can be rerolled
+     * (setupVote.js); m.public players[].lucky carries the draw.
      */
     this.lucky = !!opts.lucky;
     this.seed = (Number(opts.seed) >>> 0) || 1;
@@ -347,7 +349,7 @@ export class Match {
     this.gameSpeed = Number.isFinite(opts.combatSpeed) && opts.combatSpeed > 0 ? Math.min(opts.combatSpeed, 200) : GAME_SPEED;
     /** layouts a bot rehearses per prep with the real simulation (bot.js; 0 = heuristic placement only) */
     this.botRehearsal = Number.isInteger(opts.botRehearsal) && opts.botRehearsal >= 0 ? Math.min(opts.botRehearsal, 8) : BOT_REHEARSAL_DEFAULT;
-    this.bot = getBotStrategy(opts.botStrategy ?? env('SP_BOT_STRATEGY'));
+    this.bot = withAIAddons(getBotStrategy(opts.botStrategy ?? env('SP_BOT_STRATEGY')));
     /** wall-clock budget of one rehearsal slice (scheduleBotPrep) */
     this.botSliceMs = Number.isFinite(opts.botSliceMs) && opts.botSliceMs > 0 ? opts.botSliceMs : this.sched.virtual ? Infinity : BOT_SLICE_MS;
     /**

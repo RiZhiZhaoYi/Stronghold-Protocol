@@ -1,3 +1,4 @@
+import { ELITE_RECRUITS } from '../shared/aiAddons.js';
 // server/lobby.js — rooms, seats, host, AI seats, ready/start, reconnect, and room → Match wiring
 // (DESIGN §2, §6.1 LOBBY, §8.1). Implements the handler interface consumed by server/net.js.
 //
@@ -491,7 +492,7 @@ export class Room {
       aiPicksLast: this.aiPicksLast,
       inMatch: !!this.match,
       seats: this.seats.map((s) => (s
-        ? { seat: s.seat, playerId: s.playerId, name: s.name, isBot: s.isBot, ready: s.ready, connected: s.connected && !s.left,
+        ? { seat: s.seat, playerId: s.playerId, name: s.name, isBot: s.isBot, ready: s.ready, connected: s.connected && !s.left, ...(s.botPersona ? { botPersona: s.botPersona } : {}),
           // a room with gameplay plugins (header "Gameplay plugins"): has this player's page loaded and checked its content?
           ...(this.needsContent && !s.isBot ? { content: s.content || 'loading' } : {}),
           // 名片干员 (room.card): only a human seat with a card carries the key
@@ -827,7 +828,7 @@ export class Lobby {
       case 'room.setAiTakeover': return this.setAiTakeover(session, msg);
       case 'room.aiRequest':
       case 'room.aiVote': return aiTakeover(this, session, msg);
-      case 'room.addBot': return this.addBot(session);
+      case 'room.addBot': return this.addBot(session, msg);
       case 'room.removeBot': return this.removeBot(session, msg);
       case 'room.kick': return this.kick(session, msg);
       case 'room.start': return this.start(session);
@@ -1101,6 +1102,7 @@ export class Lobby {
     // the room's version offers it (header "Official versions": 第二期上半 / 第一期 have no 终极)
     if (!this.offered(room.version, room.mode).includes(difficulty)) return fail(ERR.BAD_TARGET, 'not a mode of this version');
     this.dropReplay(room, session.playerId);
+    if (room.seats.some(s => s?.botPersona && !ELITE_RECRUITS.find(p => p.id === s.botPersona)?.difficulties.includes(difficulty))) return fail(ERR.BAD_TARGET);
     // a plugin mode chosen (header "Gameplay plugins") carries its own difficulty: picking one leaves it
     if (room.difficulty !== difficulty || room.content?.modeId) {
       room.difficulty = difficulty;
@@ -1447,6 +1449,7 @@ export class Lobby {
     if (!this.versionEnabled(version)) return fail(ERR.VERSION_UNKNOWN);
     if (!this.offered(version, room.mode).length) return fail(ERR.VERSION_UNSUPPORTED, `${version} has no ${room.mode} rooms`);
     if (room.modded && version !== DEFAULT_VERSION) return fail(ERR.VERSION_UNSUPPORTED, 'gameplay plugins play the default version (act2autochess) only');
+    if (version !== DEFAULT_VERSION && room.seats.some(s => s?.botPersona && ELITE_RECRUITS.some(p => p.id === s.botPersona))) return fail(ERR.VERSION_UNSUPPORTED);
     if (version === room.version) return fail(ERR.ALREADY);
     if (room.versionVote) return fail(ERR.VERSION_VOTE);
     const now = this.now();
@@ -1592,7 +1595,7 @@ export class Lobby {
     this.broadcastState(room);
   }
 
-  addBot(session) {
+  addBot(session, { persona } = {}) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
     if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
@@ -1601,11 +1604,15 @@ export class Lobby {
     if (room.mode === 'solo') return fail(ERR.ROOM_FULL, 'solo rooms cannot have AI teammates');
     const idx = room.freeSeat();
     if (idx < 0) return fail(ERR.ROOM_FULL);
+    const elite = ELITE_RECRUITS.find(p => p.id === persona);
+    if (persona !== undefined && !elite) return fail(ERR.BAD_TARGET);
+    if (elite && room.seats.some(s => s?.botPersona === persona || ELITE_RECRUITS.find(p => p.id === s?.botPersona)?.band === elite.band)) return fail(ERR.ALREADY);
+    if (elite && (!elite.difficulties.includes(room.difficulty) || room.modded || (room.version && room.version !== 'act2autochess') || (room.versionVote?.version && room.versionVote.version !== 'act2autochess'))) return fail(ERR.BAD_TARGET);
     const used = new Set(room.seats.filter((s) => s && s.isBot).map((s) => s.name));
-    const name = BOT_NAMES.find((n) => !used.has(n)) || `AI·${idx + 1}`;
+    const name = elite ? `AI·${elite.name}` : BOT_NAMES.find((n) => !used.has(n)) || `AI·${idx + 1}`; // i18n-ignore: player name
     let playerId;
     do playerId = 'ai_' + randomBytes(4).toString('hex'); while (room.seatOf(playerId));
-    room.seats[idx] = { seat: idx, playerId, name, isBot: true, ready: true, connected: true, left: false };
+    room.seats[idx] = { seat: idx, playerId, name, isBot: true, ready: true, connected: true, left: false, ...(persona ? { botPersona: persona } : {}) };
     this.broadcastState(room);
     return OK;
   }
@@ -1653,6 +1660,7 @@ export class Lobby {
     if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
     if (room.match) return fail(ERR.ROOM_STARTED);
     if (room.versionVote) return fail(ERR.VERSION_VOTE);
+    if (room.seats.some(s => s?.botPersona && (!ELITE_RECRUITS.find(p => p.id === s.botPersona)?.difficulties.includes(room.difficulty) || room.modded || (room.version && room.version !== 'act2autochess')))) return fail(ERR.BAD_TARGET);
     const humans = room.activeHumans();
     if (room.content?.trusted && humans.some(s => s.consentCs !== room.content.cs)) return fail(ERR.PLUGIN_CONSENT);
     for (const s of humans) {
@@ -1994,7 +2002,7 @@ export class Lobby {
       // a setting checked for another content is filtered to this room's data (header "Gameplay plugins")
       const own = s.isBot ? null : this.seatSettings(room, s, data);
       return {
-        seat: s.seat, playerId: s.playerId, name: s.name, isBot: s.isBot, connected: s.connected,
+        seat: s.seat, playerId: s.playerId, name: s.name, isBot: s.isBot, connected: s.connected, ...(s.botPersona ? { botPersona: s.botPersona } : {}),
         // DESIGN §16: the human's checked operator loadout and (0.2.2) per-operator 潜能 / 练度 (bots fight with the defaults)
         loadout: own ? own.loadout : null,
         ops: own ? own.ops : null,

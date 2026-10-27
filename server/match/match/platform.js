@@ -1,3 +1,4 @@
+import { cancelForecastScopes } from '../aiCompute/scopes.js';
 // server/match/match/platform.js — Match methods: the platform interface of the server/match/Match.js header
 // (server/lobby.js ⇄ Match) — start, handle (validation, error isolation, flush; the intents themselves: intents.js
 // _handle), setLoadout (INFO_CHECK; rule-enabled PREP), onDisconnect / onReconnect and the full resync of one human, onLeave and 中途退出
@@ -265,6 +266,7 @@ export class MatchPlatform {
   }
 
   dispose() {
+    cancelForecastScopes(this);
     if (this.disposed) return;
     this.disposed = true;
     this.externalAI?.close();

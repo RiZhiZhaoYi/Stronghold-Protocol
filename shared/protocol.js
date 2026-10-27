@@ -1,3 +1,4 @@
+import { ELITE_RECRUITS } from './aiAddons.js';
 // Normative message catalogue (DESIGN §8). Used by server (validation) and client (building requests).
 // Every client→server message is `{ t, rid?, ...fields }`. Unknown `t` or invalid fields ⇒ ERR.BAD_MSG.
 
@@ -528,7 +529,7 @@ export const C2S = {
   'room.setAiTakeover': { on: isBool },
   'room.aiRequest': { botId: isId },
   'room.aiVote': { voteId: (v) => typeof v === 'string' && v.length <= 16, approve: isBool },
-  'room.addBot': {},
+  'room.addBot': { persona: optional((v) => ELITE_RECRUITS.some(p => p.id === v)) },
   'room.removeBot': { seat: (v) => isInt(v, 0, MAX_SEATS - 1) },
   // the host removes another human before the match (server/lobby.js kick; community report #17); playerId = the one the
   // host confirmed — a seat that changed hands meanwhile is refused

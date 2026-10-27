@@ -1,3 +1,5 @@
+import { aiAddon } from '../aiAddons/index.js';
+import { cancelForecastScopes } from '../aiCompute/scopes.js';
 // server/match/match/prep.js — Match methods: the PREP phase — its start (deferred item merges, onPrepStart), the AI
 // seats' sliced preps (scheduleBotPrep: economy + layout, rehearsal, Ready), Ready and the deadline, and its end
 // (onPrepEnd, PlayerState.endPrep, then COMBAT or the Final Assault / Hidden Core).
@@ -47,6 +49,11 @@ export class MatchPrep {
    * the delegation — which is why the continuation is installed here and not with the frame.
    */
   scheduleBotPrep(ps, i = 0) {
+    if (aiAddon(this, ps)?.PREPARE_LAST) {
+      const round = this.round;
+      const waiting = this.alivePlayers().some(p => p !== ps && p.botControlled && !p.ready && !aiAddon(this, p)?.PREPARE_LAST);
+      if (waiting) { this.later(Math.max(5, this.scaled(25)), () => { if (this.phase === PHASE.PREP && this.round === round && ps.alive && !ps.ready) this.scheduleBotPrep(ps, i); }); return; }
+    }
     const round = this.round;
     const token = (ps._botPrepToken = (ps._botPrepToken || 0) + 1);
     const valid = () => this.phase === PHASE.PREP && this.round === round && ps.alive && !ps.ready && ps.botControlled && ps._botPrepToken === token;
@@ -63,7 +70,7 @@ export class MatchPrep {
           r = gen.next();
           if (!r || typeof r.done !== 'boolean') throw new TypeError('Bot prep hooks must return a synchronous iterator');
           if (sliceCtl) sliceCtl.note(1);
-        } while (!r.done && !(sliceCtl ? sliceCtl.wall(now() - t0, this.botSliceMs) : (bounded && now() - t0 >= this.botSliceMs))); // loop-cap: generator and the bot time slice
+        } while (!r.done && !ps._botCoopWorkerWaiting && !(sliceCtl ? sliceCtl.wall(now() - t0, this.botSliceMs) : (bounded && now() - t0 >= this.botSliceMs))); // loop-cap: generator and the bot time slice
       } catch (e) {
         this.reportError(`bot ${ps.playerId}${label}`, e);
         then(null);
@@ -140,6 +147,7 @@ export class MatchPrep {
   }
 
   onReadyChanged(ps) {
+    if (ps.ready) cancelForecastScopes(this, ps);
     this.markPublic();
     void ps;
     this.maybeEndPrep();
@@ -171,6 +179,7 @@ export class MatchPrep {
   }
 
   endPrep() {
+    cancelForecastScopes(this);
     if (this.phase !== PHASE.PREP) return;
     // rehearsals still waiting for a host's answer die with the prep: their bots place the default layout, a late answer
     // is ignored (Match._takeOverRehearsal / MatchRehearsal) and nothing of them runs after the phase ended

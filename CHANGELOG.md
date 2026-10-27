@@ -1,5 +1,16 @@
 ## 0.3.3 — 2026-10-25
 
+### 内置第三方 AI（本 fork 独有）
+
+- 内置作者官方发布包：AI·阿尔图罗 v0.2.5、AI·拉维妮娅 v0.2.1、AI·祖玛玛 v0.1.1（[Stronghold-Protocol-AI](https://github.com/HankDUMPLINGZhong/Stronghold-Protocol-AI) 的 0.3.3 适配版）。作者的安装器把多个插件装成「共享运行时 + 插件目录」：`server/match/aiAddons/`（`aiAddon(m, ps)` 把原策略 `LEGACY_BOT` 包成 pickBand／pickCard／prepBegin／prepEnd／decide，精英优先选、最后准备）、`server/match/aiCompute/`、`shared/aiAddons.js` 的 `ELITE_RECRUITS`、`addons/<id>/` 载荷；三个精英各自用自己的策略，可任意顺序安装、独立升级与卸载，房间的「添加精英干员」可同时加三个（`server/lobby.js` 的 `room.addBot {persona}` 按 `ELITE_RECRUITS` 校验，同阵营重复为 `ALREADY`）。
+- 安装日志 `.ai-addons/install.json` 保存宿主文件的原始字节（升级／卸载时据此重算补丁），只留在构建机上（`.gitignore`）。重新装或升级的做法：从干净宿主（`f10cd6ff`）一次性依次 `install.mjs install .` 三个发布包，再把本提交里的 fork 改动（「恭喜发财」、测试豁免）叠上去。
+- 作者的房间页头像直接 `import { avatarUrl } from '../assets.js'`，装有三方插件时首屏因此会加载素材库；这里保留作者写法，`test/ui/plugins-client.test.js` 的「原版页面不加载素材库」在 `server/match/aiAddons/index.js` 存在时跳过。`test/i18n.test.js` 与 `test/plugins/loopCaps.test.js` 的扫描范围排除 `server/match/{arturia,lavinia,aiAddons,aiCompute}` 与 `shared/aiAddons.js`：这些是第三方代码，其中中文是比对游戏数据的键（阵营／职业名），不按界面文案规则包装。
+
+### 附加模式「恭喜发财」（本 fork 独有）
+
+- 开局随机五阶干员改为在**「选择策略」开始时**抽取（原先在「确认本局信息」打开时就抽）：确认本局信息可以用 `room.rerollSetup` 重刷，而重刷会重建卡池、战场和禁约，旧做法会把从旧卡池抽到的干员留在新的整备区里——池中剩余与持有数对不上（`server/match/invariants.js` 的 `left + held == cap`），重刷后校验失败。现在抽签在确认本局信息之后、第一次选择策略之前完成，仍然在「选择策略」的决策顺序里显示每人抽到的干员（`m.public players[].lucky`）。
+- 适配官方版本（第一期上／下半、第二期上半）：抽签按本局自己的数据（卡池与阶级）来选，四个版本都能正常抽取；新增每个版本各抽一次的回归（`test/lucky-mode.test.js`）。
+
 ### 界面与交互修复
 
 - 修正商店空装备栏的显示：第一期升到 5 级时，新装备栏留在装备区并提示刷新后补满，不再混入干员栏；尚未开放装备栏时不再误显示「已购买」。核对第一期上／下半与第二期上半的官方商店表，并加入各难度单人／四人购买、机变装备、随机池及奖励回归；装备开放等级保持官方数据（第一期 5–6 级，第二期上半 1–6 级，§36.1，round53 shopequip）。

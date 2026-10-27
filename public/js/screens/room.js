@@ -1,3 +1,5 @@
+import { ELITE_RECRUITS } from '../../../shared/aiAddons.js';
+import { avatarUrl } from '../assets.js';
 // Room screen (同盟等待室), laid out like the event's room: 4 tall seat cards (the 名片干员 portrait or the avatar frame,
 // 创建者, the ready state at the bottom, the name plate under the card; an empty seat offers 邀请 — copies the key — and,
 // to the host, 添加 AI 队友; the host's 移出 / 移除 AI 队友 at a card's top right), the top bar (leave, mode and ping, 统计 /
@@ -252,7 +254,48 @@ function CardPicker({ current, list, m, localSkins = {}, onPick, onClose }) {
  * host of a co-op room, 添加 AI 队友. `portrait` is the outfit's picture, `portraitDefault` the operator's default one
  * (given when an outfit is worn): a picture that fails to load gives way to the next, the last to the avatar frame.
  */
-function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot, onKick, onInvite, portrait = null, portraitDefault = null, operator = null, onPickCard = null, fresh = false }) {
+function EliteAvatar({ persona, ...props }) {
+  useData("assets");
+  const option = ELITE_RECRUITS.find(o => o.id === persona);
+  return html`<${AvatarFrame} ...${props} src=${option?.avatar ? avatarUrl(data.get("assets"), option.avatar, { e2: option.e2 === true }) : undefined} />`;
+}
+function EliteRecruit({ room, busy, onAdd }) {
+  const [open, setOpen] = useState(false), root = useRef(null);
+  const unavailable = option => room.seats.some(s => s?.botPersona === option.id) || !option.difficulties.includes(room.difficulty) || room.content?.vanilla === false || (room.version && room.version !== "act2autochess") || (room.versionVote?.version && room.versionVote.version !== "act2autochess");
+  const disabled = !!busy || ELITE_RECRUITS.every(unavailable);
+  useEffect(() => { if (disabled) setOpen(false); }, [disabled]);
+  useEffect(() => {
+    if (!open) return;
+    root.current?.querySelector("[role=menuitem]:not(:disabled)")?.focus();
+    const outside = e => { if (!root.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, [open]);
+  const keydown = e => {
+    if (e.key === "Escape" && open) {
+      e.preventDefault(); setOpen(false); root.current?.querySelector("[aria-haspopup=menu]")?.focus();
+    } else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
+      e.preventDefault();
+      if (!open) { setOpen(true); return; }
+      const entries = [...root.current.querySelectorAll("[role=menuitem]:not(:disabled)")];
+      if (!entries.length) return;
+      const at = entries.indexOf(document.activeElement);
+      const next = e.key === "Home" ? 0 : e.key === "End" ? entries.length - 1 : (at + (e.key === "ArrowUp" ? -1 : 1) + entries.length) % entries.length;
+      entries[next].focus();
+    }
+  };
+  return html`<div ref=${root} class="elite-recruit" style="width:100%;position:relative" onKeyDown=${keydown}
+    onBlur=${e => { if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false); }}>
+    <${Button} variant="secondary" size="sm" block=${true} disabled=${disabled} aria-haspopup="menu" aria-expanded=${open ? "true" : "false"}
+      onClick=${() => setOpen(!open)}>${t("添加精英干员")} <span aria-hidden="true">▾</span><//>
+    ${open && html`<div role="menu" aria-label=${t("添加精英干员")} style="display:grid;grid-auto-rows:2.5em;gap:.04rem;max-height:calc(5em + .04rem);overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;box-sizing:content-box;margin-top:.04rem;padding:.04rem;border:1px solid var(--line-2);background:var(--bg-1,#0b0e0d)">
+      ${ELITE_RECRUITS.map(option => html`<${Button} key=${option.id} role="menuitem" variant="secondary" size="sm" block=${true}
+        style="min-height:0;height:100%;white-space:nowrap" disabled=${unavailable(option)} onClick=${() => { setOpen(false); onAdd(option.id); }}>${t(option.name)}<//>`)}
+    </div>`}
+  </div>`;
+}
+
+function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onAddElite, onRemoveBot, onKick, onInvite, portrait = null, portraitDefault = null, operator = null, onPickCard = null, fresh = false }) {
   const [badArt, setBadArt] = useState([]);
   const coop = room.mode !== 'solo';
   // the 转场 flash: a seat that turns ready (or becomes the host's), and an AI teammate added while the room is open
@@ -269,7 +312,7 @@ function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot,
           ? html`<button type="button" class="rseat__invite" onClick=${onInvite} title=${t('复制同盟密钥以邀请队友')}>
               <span class="rseat__plus" aria-hidden="true"></span><b>${t('邀请')}</b><small>${t('复制同盟密钥以邀请队友')}</small></button>`
           : html`<span class="rseat__wait"><small>${t('等待博士加入')}</small></span>`}
-        ${canAdd ? html`<${Button} variant="secondary" size="sm" icon="robot" class="rseat__add" loading=${busy === 'add'} onClick=${onAddBot}>${t('添加 AI 队友')}<//>` : null}
+        ${canAdd ? html`<div class="rseat__add" style="display:flex;flex-direction:column;gap:.08rem;width:calc(100% - .12rem);padding:0"><${Button} variant="secondary" size="sm" icon="robot" block=${true} loading=${busy === 'add'} onClick=${onAddBot}>${t('添加 AI 队友')}<//><${EliteRecruit} room=${room} busy=${busy} onAdd=${onAddElite} /></div>` : null}
         <span class="rseat__noinfo" aria-hidden="true">NOINFO</span>
       </div>
       <div class="rseat__plate rseat__plate--empty"><span class="seat__state t-dim">${t('空位')}</span></div>
@@ -293,7 +336,7 @@ function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot,
     <div class="seat__art rseat__art">
       ${art
         ? html`<img key=${art} class="seat__portrait" src=${art} alt="" draggable=${false} onError=${() => setBadArt((b) => (b.includes(art) ? b : [...b, art]))} />`
-        : html`<${AvatarFrame} size="xl" name=${seat.name} seat=${index} bot=${seat.isBot} self=${isMe} ready=${state === 'ready'} offline=${offline} />`}
+        : html`<${seat.isBot && ELITE_RECRUITS.some(p => p.id === seat.botPersona) ? EliteAvatar : AvatarFrame} persona=${seat.botPersona} size="xl" name=${seat.name} seat=${index} bot=${seat.isBot} self=${isMe} ready=${state === 'ready'} offline=${offline} />`}
       <div class="rseat__top">
         ${isHostSeat ? html`<span class="rseat__host"><${Icon} name="crown" />${t('创建者')}</span>` : null}
         ${seat.isBot ? html`<span class="rseat__bot"><${Icon} name="robot" />${t('AI 队友')}</span>` : null}
@@ -321,7 +364,7 @@ function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot,
       onClick=${() => onKick(index, seat.name, seat.playerId)} title=${t('将该博士移出同盟')} aria-label=${t('移出该博士')}><${Icon} name="user" /><${Icon} name="close" /></button>` : null}
     <div class="rseat__plate">
       ${isMe ? html`<span class="rseat__me" role="img" aria-label=${t('你')} title=${t('你')}><${Icon} name="info" /></span>` : null}
-      <${AvatarFrame} size="sm" name=${seat.name} seat=${index} bot=${seat.isBot} self=${isMe} />
+      <${seat.isBot && ELITE_RECRUITS.some(p => p.id === seat.botPersona) ? EliteAvatar : AvatarFrame} persona=${seat.botPersona} size="sm" name=${seat.name} seat=${index} bot=${seat.isBot} self=${isMe} />
       <span class="rseat__who"><b class="seat__name">${botPrefix ? html`<span class="seat__name-pre">${botPrefix[0]}</span>${botPrefix[1]}` : seat.name || t('博士')}</b>${isMe ? html`<span class="seat__you" aria-hidden="true">${t('你')}</span>` : null}</span>
       <small class="rseat__doc">${seat.isBot ? 'AUTONOMOUS UNIT' : `DOCTOR #${doctorNo(seat.playerId)}`}</small>
     </div>
@@ -560,6 +603,7 @@ export function RoomScreen() {
   const toggleReady = () => run('ready', () => net.request('room.ready', { ready: !myReady }));
   const start = () => run('start', () => net.request('room.start', {}));
   const addBot = () => run('add', () => net.request('room.addBot', {}));
+  const addElite = persona => run('add', () => net.request('room.addBot', { persona }));
   const removeBot = (seat) => run(`rm${seat}`, () => net.request('room.removeBot', { seat }));
   // the host removes a human before the match (community report #17): asked first; the player may join again. The
   // confirmed player's id goes along: if they left and someone else took the seat meanwhile, the server refuses it.
@@ -728,7 +772,7 @@ export function RoomScreen() {
         // the player's outfit for that operator (header "Outfits"); null = the default art
         const skin = op ? seatCardSkin(s, op.chess.charId, { myId: me.playerId, localSkins, players: facts.occupied, otherSkins }) : null;
         return html`<${SeatCard} key=${s ? `p${s.playerId}` : `e${i}`} seat=${s} index=${i} room=${room} facts=${facts}
-          myId=${me.playerId} busy=${busy} onAddBot=${addBot} onRemoveBot=${removeBot} onKick=${kick} onInvite=${() => copy('code')}
+          myId=${me.playerId} busy=${busy} onAddBot=${addBot} onAddElite=${addElite} onRemoveBot=${removeBot} onKick=${kick} onInvite=${() => copy('code')}
           portrait=${op ? chessPortraitUrl(data.get('assets'), op.chess, { skin }) : null}
           portraitDefault=${op && skin ? chessPortraitUrl(data.get('assets'), op.chess) : null} operator=${op?.chess} onPickCard=${() => setPicking(true)}
           fresh=${shownRoom.current === room.code} />`;
